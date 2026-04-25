@@ -1,0 +1,3 @@
+# Docker compose - se completará cuando backend y frontend estén listos
+version: '3.8'
+services:
