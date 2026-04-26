@@ -81,3 +81,10 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"email":"admin@inventario.com","password":"123456"}' \
             | grep -q '"token"'
+
+      - name: Login check (empleado seed)
+        run: |
+          curl -sSf -X POST http://localhost:3001/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"empleado@inventario.com","password":"123456"}' \
+            | grep -q '"token"'
