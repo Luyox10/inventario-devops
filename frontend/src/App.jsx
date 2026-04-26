@@ -6,6 +6,7 @@ import AdminDashboardPage from './pages/admin/AdminDashboardPage.jsx';
 import EmpleadoDashboardPage from './pages/empleado/EmpleadoDashboardPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import RequireAuth from './routes/RequireAuth.jsx';
+import VentasPage from './pages/empleado/VentasPage';
 
 export default function App() {
   return (
