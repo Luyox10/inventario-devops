@@ -22,12 +22,48 @@ export default function AdminProductosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const [q, setQ] = useState('');
+  const [estado, setEstado] = useState('todos');
+  const [precioMin, setPrecioMin] = useState('');
+  const [precioMax, setPrecioMax] = useState('');
+
   const [mode, setMode] = useState('create');
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
 
   const formTitle = useMemo(() => (mode === 'edit' ? 'Editar producto' : 'Registrar producto'), [mode]);
+
+  const filteredRows = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    const min = precioMin === '' ? null : Number(precioMin);
+    const max = precioMax === '' ? null : Number(precioMax);
+
+    return rows.filter((r) => {
+      const nombre = String(r.nombre || '').toLowerCase();
+      const sku = String(r.sku || '').toLowerCase();
+      const matchesQuery = !s || nombre.includes(s) || sku.includes(s);
+
+      const actual = Number(r.stock_actual || 0);
+      const minimo = Number(r.stock_minimo || 0);
+      const matchesEstado =
+        estado === 'todos'
+          ? true
+          : estado === 'ok'
+            ? actual > minimo && actual > 0
+            : estado === 'bajo'
+              ? actual > 0 && actual <= minimo
+              : estado === 'sin_stock'
+                ? actual <= 0
+                : true;
+
+      const precio = Number(r.precio);
+      const matchesMin = min === null || (!Number.isNaN(precio) && precio >= min);
+      const matchesMax = max === null || (!Number.isNaN(precio) && precio <= max);
+
+      return matchesQuery && matchesEstado && matchesMin && matchesMax;
+    });
+  }, [rows, q, estado, precioMin, precioMax]);
 
   async function refresh() {
     setError('');
@@ -68,8 +104,8 @@ export default function AdminProductosPage() {
       unidad: row.unidad ?? 'und',
       descripcion: row.descripcion ?? '',
       precio: String(row.precio ?? ''),
-      stock_actual: String(row.stock_actual ?? ''),
-      stock_minimo: String(row.stock_minimo ?? ''),
+      stock_actual: '',
+      stock_minimo: '',
     });
     setError('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -81,15 +117,22 @@ export default function AdminProductosPage() {
     setSaving(true);
 
     try {
-      const payload = {
+      const basePayload = {
         nombre: form.nombre.trim(),
         sku: form.sku.trim() || null,
         unidad: form.unidad,
         descripcion: form.descripcion.trim() || null,
         precio: Number(form.precio),
-        stock_actual: Number(form.stock_actual || 0),
-        stock_minimo: Number(form.stock_minimo || 0),
       };
+
+      const payload =
+        mode === 'edit'
+          ? basePayload
+          : {
+              ...basePayload,
+              stock_actual: Number(form.stock_actual || 0),
+              stock_minimo: Number(form.stock_minimo || 0),
+            };
 
       if (!payload.nombre || Number.isNaN(payload.precio)) {
         setError('Completa nombre y precio correctamente');
@@ -200,29 +243,37 @@ export default function AdminProductosPage() {
                 />
               </label>
 
-              <label style={styles.label}>
-                Stock actual
-                <input
-                  value={form.stock_actual}
-                  onChange={(e) => onChange('stock_actual', e.target.value)}
-                  type="number"
-                  step="1"
-                  min="0"
-                  style={styles.input}
-                />
-              </label>
+              {mode === 'create' ? (
+                <label style={styles.label}>
+                  Stock actual
+                  <input
+                    value={form.stock_actual}
+                    onChange={(e) => onChange('stock_actual', e.target.value)}
+                    type="number"
+                    step="1"
+                    min="0"
+                    style={styles.input}
+                  />
+                </label>
+              ) : (
+                <div />
+              )}
 
-              <label style={styles.label}>
-                Stock mínimo
-                <input
-                  value={form.stock_minimo}
-                  onChange={(e) => onChange('stock_minimo', e.target.value)}
-                  type="number"
-                  step="1"
-                  min="0"
-                  style={styles.input}
-                />
-              </label>
+              {mode === 'create' ? (
+                <label style={styles.label}>
+                  Stock mínimo
+                  <input
+                    value={form.stock_minimo}
+                    onChange={(e) => onChange('stock_minimo', e.target.value)}
+                    type="number"
+                    step="1"
+                    min="0"
+                    style={styles.input}
+                  />
+                </label>
+              ) : (
+                <div />
+              )}
             </div>
 
             {error ? <div style={styles.error}>{error}</div> : null}
@@ -241,9 +292,57 @@ export default function AdminProductosPage() {
             </button>
           </div>
 
+          <div style={styles.filters}>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar por nombre o SKU"
+              style={styles.input}
+            />
+
+            <select value={estado} onChange={(e) => setEstado(e.target.value)} style={styles.select}>
+              <option value="todos">Estado: Todos</option>
+              <option value="ok">Estado: OK</option>
+              <option value="bajo">Estado: Bajo</option>
+              <option value="sin_stock">Estado: Sin stock</option>
+            </select>
+
+            <input
+              value={precioMin}
+              onChange={(e) => setPrecioMin(e.target.value)}
+              placeholder="Precio mín."
+              type="number"
+              step="0.01"
+              min="0"
+              style={styles.input}
+            />
+            <input
+              value={precioMax}
+              onChange={(e) => setPrecioMax(e.target.value)}
+              placeholder="Precio máx."
+              type="number"
+              step="0.01"
+              min="0"
+              style={styles.input}
+            />
+
+            <button
+              onClick={() => {
+                setQ('');
+                setEstado('todos');
+                setPrecioMin('');
+                setPrecioMax('');
+              }}
+              style={styles.secondaryBtn}
+              type="button"
+            >
+              Limpiar
+            </button>
+          </div>
+
           {loading ? (
             <div style={styles.muted}>Cargando...</div>
-          ) : rows.length === 0 ? (
+          ) : filteredRows.length === 0 ? (
             <div style={styles.muted}>No hay productos registrados.</div>
           ) : (
             <div style={styles.tableWrap}>
@@ -254,20 +353,30 @@ export default function AdminProductosPage() {
                     <th style={styles.th}>SKU</th>
                     <th style={styles.th}>Unidad</th>
                     <th style={styles.th}>Precio</th>
-                    <th style={styles.th}>Stock</th>
-                    <th style={styles.th}>Mínimo</th>
+                    <th style={styles.th}>Estado</th>
                     <th style={styles.thRight}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.id}>
+                  {filteredRows.map((r) => {
+                    const actual = Number(r.stock_actual || 0);
+                    const minimo = Number(r.stock_minimo || 0);
+                    const rowStyle =
+                      actual <= 0 ? styles.trDanger : actual <= minimo ? styles.trWarn : styles.trOk;
+
+                    return (
+                      <tr key={r.id} style={rowStyle}>
                       <td style={styles.td}>{r.nombre}</td>
                       <td style={styles.td}>{r.sku || '-'}</td>
                       <td style={styles.td}>{r.unidad || 'und'}</td>
                       <td style={styles.td}>S/ {Number(r.precio).toFixed(2)}</td>
-                      <td style={styles.td}>{r.stock_actual}</td>
-                      <td style={styles.td}>{r.stock_minimo}</td>
+                      <td style={styles.td}>
+                        {Number(r.stock_actual || 0) <= 0
+                          ? 'SIN STOCK'
+                          : Number(r.stock_actual || 0) <= Number(r.stock_minimo || 0)
+                            ? 'BAJO'
+                            : 'OK'}
+                      </td>
                       <td style={styles.tdRight}>
                         <button style={styles.smallBtn} onClick={() => startEdit(r)}>
                           Editar
@@ -276,8 +385,9 @@ export default function AdminProductosPage() {
                           Eliminar
                         </button>
                       </td>
-                    </tr>
-                  ))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -322,6 +432,13 @@ const styles = {
   },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   h3: { margin: 0, color: '#0b2a52', fontSize: 18, fontWeight: 900 },
+  filters: {
+    display: 'grid',
+    gridTemplateColumns: '1.5fr 1fr 1fr 1fr auto',
+    gap: 10,
+    marginTop: 12,
+    alignItems: 'center',
+  },
   form: { display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 },
   row2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 },
   row3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 },
@@ -412,6 +529,15 @@ const styles = {
     borderBottom: '1px solid rgba(11, 42, 82, 0.1)',
     whiteSpace: 'nowrap',
     textAlign: 'right',
+  },
+  trOk: {
+    background: 'rgba(16, 185, 129, 0.08)',
+  },
+  trWarn: {
+    background: 'rgba(245, 158, 11, 0.10)',
+  },
+  trDanger: {
+    background: 'rgba(239, 68, 68, 0.10)',
   },
   smallBtn: {
     padding: '8px 10px',
