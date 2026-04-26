@@ -5,6 +5,10 @@ import LoginPage from './pages/LoginPage.jsx';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage.jsx';
 import AdminProductosPage from './pages/admin/AdminProductosPage.jsx';
 import AdminStockPage from './pages/admin/AdminStockPage.jsx';
+import AdminVentasPage from './pages/admin/AdminVentasPage.jsx';
+import AdminAlertasPage from './pages/admin/AdminAlertasPage.jsx';
+import AdminReportesPage from './pages/admin/AdminReportesPage.jsx';
+import AdminUsuariosPage from './pages/admin/AdminUsuariosPage.jsx';
 import EmpleadoDashboardPage from './pages/empleado/EmpleadoDashboardPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import RequireAuth from './routes/RequireAuth.jsx';
@@ -28,10 +32,10 @@ export default function App() {
         <Route path="dashboard" element={<AdminDashboardPage />} />
         <Route path="productos" element={<AdminProductosPage />} />
         <Route path="stock" element={<AdminStockPage />} />
-        <Route path="ventas" element={<div style={{ color: '#0b2a52' }}>Próximamente</div>} />
-        <Route path="alertas" element={<div style={{ color: '#0b2a52' }}>Próximamente</div>} />
-        <Route path="reportes" element={<div style={{ color: '#0b2a52' }}>Próximamente</div>} />
-        <Route path="usuarios" element={<div style={{ color: '#0b2a52' }}>Próximamente</div>} />
+        <Route path="ventas" element={<AdminVentasPage />} />
+        <Route path="alertas" element={<AdminAlertasPage />} />
+        <Route path="reportes" element={<AdminReportesPage />} />
+        <Route path="usuarios" element={<AdminUsuariosPage />} />
       </Route>
 
       <Route
