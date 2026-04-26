@@ -6,7 +6,7 @@ import { useAuth } from '../state/auth/AuthContext.jsx';
 const navItems = [
   { to: '/admin/dashboard', label: 'Dashboard', enabled: true },
   { to: '/admin/productos', label: 'Productos', enabled: true },
-  { to: '/admin/stock', label: 'Stock', enabled: false },
+  { to: '/admin/stock', label: 'Stock', enabled: true },
   { to: '/admin/ventas', label: 'Ventas', enabled: false },
   { to: '/admin/alertas', label: 'Alertas', enabled: false },
   { to: '/admin/reportes', label: 'Reportes', enabled: false },
