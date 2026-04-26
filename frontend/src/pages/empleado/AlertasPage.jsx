@@ -6,43 +6,98 @@ const AlertasPage = () => {
   const { token } = useAuth();
   const [alertas, setAlertas] = useState([]);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // El flujo: Frontend solicita a Backend -> Backend consulta BD
+    setLoading(true);
     apiFetch('/alertas', { token })
-      .then(data => setAlertas(data))
+      .then(data => {
+        setAlertas(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
       .catch(err => {
         console.error("Error al obtener alertas:", err);
         setError("No se pudieron cargar las alertas.");
+        setLoading(false);
       });
   }, [token]);
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>Alertas de Stock Bajo</h1>
-      <p>Productos que requieren reposición inmediata.</p>
-      
-      {error && <p style={{ color: 'orange' }}>{error}</p>}
+    <div>
+      {/* Títulos con el peso visual del Admin (fontWeight 900) */}
+      <header style={{ marginBottom: '25px' }}>
+        <h2 style={{ margin: 0, color: '#0b2a52', fontSize: '28px', fontWeight: 900 }}>
+          Alertas de Stock Bajo
+        </h2>
+        <p style={{ margin: '5px 0 0', color: 'rgba(11, 42, 82, 0.7)', fontSize: '15px' }}>
+          Productos que requieren reposición inmediata.
+        </p>
+      </header>
 
-      {alertas.length === 0 ? (
-        <div style={{ padding: '20px', backgroundColor: '#e7f3ef', color: '#2d6a4f' }}>
+      {/* Manejo de Error con estilo consistente */}
+      {error && (
+        <div style={{ 
+          padding: '12px', 
+          backgroundColor: 'rgba(239, 68, 68, 0.1)', 
+          border: '1px solid rgba(239, 68, 68, 0.2)', 
+          borderRadius: '12px', 
+          color: '#b91c1c', 
+          marginBottom: '20px',
+          fontSize: '14px'
+        }}>
+          ⚠️ {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ textAlign: 'center', color: 'rgba(11, 42, 82, 0.5)', padding: '20px' }}>
+          Verificando niveles de inventario...
+        </div>
+      ) : alertas.length === 0 ? (
+        /* Cuadro de éxito estilizado */
+        <div style={{ 
+          padding: '30px', 
+          backgroundColor: 'rgba(52, 211, 153, 0.1)', 
+          color: '#065f46', 
+          borderRadius: '15px', 
+          textAlign: 'center',
+          fontWeight: 600,
+          border: '1px solid rgba(52, 211, 153, 0.2)'
+        }}>
           ✅ Todo el inventario se encuentra en niveles óptimos.
         </div>
       ) : (
-        <ul style={{ listStyleType: 'none', padding: 0 }}>
+        /* Lista de alertas con diseño de tarjeta "Glass" interna */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {alertas.map((alerta) => (
-            <li key={alerta.id} style={{ 
-              padding: '15px', 
-              marginBottom: '10px', 
-              backgroundColor: '#fff5f5', 
-              borderLeft: '5px solid #e53e3e',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            <div key={alerta.id} style={{ 
+              padding: '18px', 
+              backgroundColor: 'rgba(255, 255, 255, 0.4)', // Transparencia suave
+              borderRadius: '16px',
+              border: '1px solid rgba(255, 255, 255, 0.5)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
             }}>
-              <strong>⚠️ PRODUCTO: {alerta.nombre}</strong> <br />
-              <span>Stock actual: <span style={{ color: '#e53e3e', fontWeight: 'bold' }}>{alerta.stock}</span> unidades.</span>
-            </li>
+              <div>
+                <div style={{ color: 'rgba(11, 42, 82, 0.6)', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginBottom: '4px' }}>
+                  Producto Crítico
+                </div>
+                <div style={{ color: '#0b2a52', fontWeight: 800, fontSize: '16px' }}>
+                  {alerta.nombre}
+                </div>
+              </div>
+              
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '12px', color: 'rgba(11, 42, 82, 0.6)' }}>Stock actual</div>
+                <div style={{ fontSize: '20px', fontWeight: 900, color: '#e53e3e' }}>
+                  {alerta.stock} <span style={{ fontSize: '12px', fontWeight: 600 }}>unid.</span>
+                </div>
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

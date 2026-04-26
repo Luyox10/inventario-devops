@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, Outlet } from 'react-router-dom';
 
 import LoginPage from './pages/LoginPage.jsx';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage.jsx';
@@ -21,6 +21,7 @@ export default function App() {
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
 
+      {/* RUTAS DE ADMINISTRADOR */}
       <Route
         path="/admin"
         element={
@@ -39,60 +40,25 @@ export default function App() {
         <Route path="usuarios" element={<div style={{ color: '#0b2a52' }}>Próximamente</div>} />
       </Route>
 
+      {/* RUTAS DE EMPLEADO (Refactorizadas) */}
       <Route
-        path="/empleado/dashboard"
+        path="/empleado"
         element={
           <RequireAuth allowRoles={["EMPLEADO"]}>
+            {/* El Layout envuelve a todas las sub-rutas automáticamente */}
             <EmpleadoLayout>
-              <EmpleadoDashboardPage />
+              <Outlet /> 
             </EmpleadoLayout>
           </RequireAuth>
         }
-      />
-
-      <Route
-        path="/empleado/ventas"
-        element={
-          <RequireAuth allowRoles={["EMPLEADO"]}>
-            <EmpleadoLayout>
-              <VentasPage />
-            </EmpleadoLayout>
-          </RequireAuth>
-        }
-      />
-
-      <Route
-        path="/empleado/productos"
-        element={
-          <RequireAuth allowRoles={["EMPLEADO"]}>
-            <EmpleadoLayout>
-              <ProductosPage />
-            </EmpleadoLayout> {/**/}
-          </RequireAuth>
-        }
-      />
-
-      <Route
-        path="/empleado/reposicion"
-        element={
-          <RequireAuth allowRoles={["EMPLEADO"]}>
-            <EmpleadoLayout>
-              <ReposicionPage />
-            </EmpleadoLayout>
-          </RequireAuth>
-        }
-      />
-
-      <Route
-        path="/empleado/alertas"
-        element={
-          <RequireAuth allowRoles={["EMPLEADO"]}>
-            <EmpleadoLayout>
-              <AlertasPage />
-            </EmpleadoLayout>
-          </RequireAuth>
-        }
-      />
+      >
+        <Route index element={<Navigate to="/empleado/dashboard" replace />} />
+        <Route path="dashboard" element={<EmpleadoDashboardPage />} />
+        <Route path="ventas" element={<VentasPage />} />
+        <Route path="productos" element={<ProductosPage />} />
+        <Route path="reposicion" element={<ReposicionPage />} />
+        <Route path="alertas" element={<AlertasPage />} />
+      </Route>
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
