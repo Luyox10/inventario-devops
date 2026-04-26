@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 
 import { useAuth } from '../state/auth/AuthContext.jsx';
@@ -7,18 +7,75 @@ const navItems = [
   { to: '/admin/dashboard', label: 'Dashboard', enabled: true },
   { to: '/admin/productos', label: 'Productos', enabled: true },
   { to: '/admin/stock', label: 'Stock', enabled: true },
-  { to: '/admin/ventas', label: 'Ventas', enabled: false },
-  { to: '/admin/alertas', label: 'Alertas', enabled: false },
-  { to: '/admin/reportes', label: 'Reportes', enabled: false },
-  { to: '/admin/usuarios', label: 'Usuarios', enabled: false },
+  { to: '/admin/ventas', label: 'Ventas', enabled: true },
+  { to: '/admin/alertas', label: 'Alertas', enabled: true },
+  { to: '/admin/reportes', label: 'Reportes', enabled: true },
+  { to: '/admin/usuarios', label: 'Usuarios', enabled: true },
 ];
 
 export default function AdminLayout() {
   const { user, logout } = useAuth();
 
+  const [isMobile, setIsMobile] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    function onResize() {
+      const next = window.innerWidth < 900;
+      setIsMobile(next);
+      if (!next) setMenuOpen(false);
+    }
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const computedStyles = useMemo(() => {
+    if (!isMobile) return styles;
+    return {
+      ...styles,
+      page: {
+        ...styles.page,
+        display: 'block',
+      },
+      sidebar: {
+        ...styles.sidebar,
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        height: '100vh',
+        width: 280,
+        zIndex: 60,
+        transform: menuOpen ? 'translateX(0)' : 'translateX(-110%)',
+        transition: 'transform 180ms ease',
+        boxShadow: '0 28px 60px rgba(0, 0, 0, 0.35)',
+      },
+      main: {
+        ...styles.main,
+        padding: 14,
+      },
+    };
+  }, [isMobile, menuOpen]);
+
   return (
-    <div style={styles.page}>
-      <aside style={styles.sidebar}>
+    <div style={computedStyles.page}>
+      {isMobile ? (
+        <header style={styles.mobileTopbar}>
+          <button onClick={() => setMenuOpen(true)} style={styles.menuBtn} aria-label="Abrir menú">
+            Menú
+          </button>
+          <Link to="/admin/dashboard" style={styles.mobileBrand}>
+            Bodega Helen
+          </Link>
+          <button onClick={logout} style={styles.mobileLogoutBtn} aria-label="Cerrar sesión">
+            Salir
+          </button>
+        </header>
+      ) : null}
+
+      {isMobile && menuOpen ? <div style={styles.backdrop} onClick={() => setMenuOpen(false)} /> : null}
+
+      <aside style={computedStyles.sidebar}>
         <Link to="/admin/dashboard" style={styles.brand}>
           Bodega Helen
         </Link>
@@ -43,6 +100,7 @@ export default function AdminLayout() {
                   ...styles.navLink,
                   ...(isActive ? styles.navLinkActive : null),
                 })}
+                onClick={() => setMenuOpen(false)}
               >
                 {it.label}
               </NavLink>
@@ -55,13 +113,19 @@ export default function AdminLayout() {
             <div style={styles.userName}>{user?.nombre || 'Usuario'}</div>
             <div style={styles.userEmail}>{user?.email || ''}</div>
           </div>
-          <button onClick={logout} style={styles.logoutBtn}>
-            Cerrar sesión
-          </button>
+          {!isMobile ? (
+            <button onClick={logout} style={styles.logoutBtn}>
+              Cerrar sesión
+            </button>
+          ) : (
+            <button onClick={() => setMenuOpen(false)} style={styles.closeMenuBtn}>
+              Cerrar
+            </button>
+          )}
         </div>
       </aside>
 
-      <main style={styles.main}>
+      <main style={computedStyles.main}>
         <Outlet />
       </main>
     </div>
@@ -168,5 +232,57 @@ const styles = {
   },
   main: {
     padding: 20,
+  },
+  mobileTopbar: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 50,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    padding: '12px 14px',
+    background: 'rgba(235, 240, 255, 0.75)',
+    borderBottom: '1px solid rgba(255,255,255,0.55)',
+    backdropFilter: 'blur(14px)',
+  },
+  menuBtn: {
+    padding: '10px 12px',
+    borderRadius: 14,
+    border: '1px solid rgba(11, 42, 82, 0.14)',
+    background: 'rgba(255,255,255,0.55)',
+    color: 'rgba(11, 42, 82, 0.92)',
+    fontWeight: 900,
+    cursor: 'pointer',
+  },
+  mobileBrand: {
+    fontWeight: 900,
+    color: '#0b2a52',
+    textDecoration: 'none',
+    letterSpacing: 0.2,
+  },
+  mobileLogoutBtn: {
+    padding: '10px 12px',
+    borderRadius: 14,
+    border: 'none',
+    background: 'rgba(11, 42, 82, 0.92)',
+    color: 'rgba(255,255,255,0.95)',
+    fontWeight: 900,
+    cursor: 'pointer',
+  },
+  closeMenuBtn: {
+    padding: '10px 12px',
+    borderRadius: 14,
+    border: '1px solid rgba(11, 42, 82, 0.14)',
+    background: 'rgba(255,255,255,0.55)',
+    color: 'rgba(11, 42, 82, 0.92)',
+    fontWeight: 900,
+    cursor: 'pointer',
+  },
+  backdrop: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.35)',
+    zIndex: 55,
   },
 };

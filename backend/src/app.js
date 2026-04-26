@@ -12,6 +12,7 @@ const stockRoutes = require('./routes/stock.routes');
 const ventaRoutes = require('./routes/venta.routes');
 const alertaRoutes = require('./routes/alerta.routes');
 const reporteRoutes = require('./routes/reporte.routes');
+const usuarioRoutes = require('./routes/usuario.routes');
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use('/api/stock', stockRoutes);
 app.use('/api/ventas', ventaRoutes);
 app.use('/api/alertas', alertaRoutes);
 app.use('/api/reportes', reporteRoutes);
+app.use('/api/usuarios', usuarioRoutes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
