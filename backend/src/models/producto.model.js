@@ -3,7 +3,7 @@ const { pool } = require('../config/db');
 async function listProductos({ includeInactive = false } = {}) {
   const where = includeInactive ? '' : 'WHERE activo = 1';
   const [rows] = await pool.query(
-    `SELECT id, nombre, sku, descripcion, precio, stock_actual, stock_minimo, activo, created_at, updated_at
+    `SELECT id, nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo, activo, created_at, updated_at
      FROM productos
      ${where}
      ORDER BY id DESC`
@@ -13,7 +13,7 @@ async function listProductos({ includeInactive = false } = {}) {
 
 async function getProductoById(id) {
   const [rows] = await pool.query(
-    `SELECT id, nombre, sku, descripcion, precio, stock_actual, stock_minimo, activo, created_at, updated_at
+    `SELECT id, nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo, activo, created_at, updated_at
      FROM productos
      WHERE id = ?
      LIMIT 1`,
@@ -22,13 +22,14 @@ async function getProductoById(id) {
   return rows[0] || null;
 }
 
-async function createProducto({ nombre, sku, descripcion, precio, stock_actual, stock_minimo }) {
+async function createProducto({ nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo }) {
   const [result] = await pool.query(
-    `INSERT INTO productos (nombre, sku, descripcion, precio, stock_actual, stock_minimo, activo)
-     VALUES (?, ?, ?, ?, ?, ?, 1)`,
+    `INSERT INTO productos (nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo, activo)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
     [
       nombre,
       sku || null,
+      unidad || 'und',
       descripcion || null,
       precio,
       Number(stock_actual || 0),
@@ -39,13 +40,14 @@ async function createProducto({ nombre, sku, descripcion, precio, stock_actual, 
   return getProductoById(result.insertId);
 }
 
-async function updateProducto(id, { nombre, sku, descripcion, precio, stock_actual, stock_minimo, activo }) {
+async function updateProducto(id, { nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo, activo }) {
   const existing = await getProductoById(id);
   if (!existing) return null;
 
   const next = {
     nombre: nombre ?? existing.nombre,
     sku: sku ?? existing.sku,
+    unidad: unidad ?? existing.unidad,
     descripcion: descripcion ?? existing.descripcion,
     precio: precio ?? existing.precio,
     stock_actual: stock_actual ?? existing.stock_actual,
@@ -55,11 +57,12 @@ async function updateProducto(id, { nombre, sku, descripcion, precio, stock_actu
 
   await pool.query(
     `UPDATE productos
-     SET nombre = ?, sku = ?, descripcion = ?, precio = ?, stock_actual = ?, stock_minimo = ?, activo = ?
+     SET nombre = ?, sku = ?, unidad = ?, descripcion = ?, precio = ?, stock_actual = ?, stock_minimo = ?, activo = ?
      WHERE id = ?`,
     [
       next.nombre,
       next.sku,
+      next.unidad,
       next.descripcion,
       next.precio,
       Number(next.stock_actual),

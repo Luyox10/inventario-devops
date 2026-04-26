@@ -7,6 +7,28 @@ on:
     branches: ["main", "master"]
 
 jobs:
+  frontend-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
   backend-ci:
     runs-on: ubuntu-latest
 
@@ -88,3 +110,53 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"email":"empleado@inventario.com","password":"123456"}' \
             | grep -q '"token"'
+
+      - name: Productos CRUD (admin)
+        run: |
+          ADMIN_TOKEN=$(curl -sSf -X POST http://localhost:3001/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"admin@inventario.com","password":"123456"}' \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+          CREATED=$(curl -sSf -X POST http://localhost:3001/api/productos \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            -d '{"nombre":"Arroz","sku":"SKU-CI-ARROZ","unidad":"kg","descripcion":"CI","precio":10.50,"stock_actual":5,"stock_minimo":1}')
+
+          PRODUCT_ID=$(echo "$CREATED" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+          curl -sSf http://localhost:3001/api/productos \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            | grep -q 'SKU-CI-ARROZ'
+
+          curl -sSf -X PUT http://localhost:3001/api/productos/${PRODUCT_ID} \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            -d '{"precio":11.00,"unidad":"kg"}' \
+            | grep -q '"id"'
+
+          curl -sSf -X DELETE http://localhost:3001/api/productos/${PRODUCT_ID} \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            | grep -q '"activo"'
+
+      - name: Reportes dashboard (admin)
+        run: |
+          ADMIN_TOKEN=$(curl -sSf -X POST http://localhost:3001/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"admin@inventario.com","password":"123456"}' \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+          curl -sSf http://localhost:3001/api/reportes/dashboard \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            | grep -q 'total'
+
+      - name: Alertas stock bajo (empleado)
+        run: |
+          EMP_TOKEN=$(curl -sSf -X POST http://localhost:3001/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"empleado@inventario.com","password":"123456"}' \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+          curl -sSf http://localhost:3001/api/alertas/stock-bajo \
+            -H "Authorization: Bearer ${EMP_TOKEN}" \
+            | grep -q '\['
