@@ -1,0 +1,83 @@
+name: CI Backend
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+jobs:
+  backend-ci:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_DATABASE: inventario
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -prootpass"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install mysql client
+        run: sudo apt-get update && sudo apt-get install -y mysql-client
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Wait for MySQL
+        run: |
+          for i in {1..30}; do
+            mysqladmin ping -h 127.0.0.1 -prootpass && break
+            sleep 2
+          done
+
+      - name: Apply DB schema
+        run: mysql -h 127.0.0.1 -uroot -prootpass < database/schema.sql
+
+      - name: Apply seed data
+        run: mysql -h 127.0.0.1 -uroot -prootpass < database/seed.sql
+
+      - name: Start API (background)
+        working-directory: backend
+        env:
+          PORT: 3001
+          CORS_ORIGIN: "*"
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: rootpass
+          DB_NAME: inventario
+          JWT_SECRET: ci_secret
+          JWT_EXPIRES_IN: 1d
+          BOOTSTRAP_SECRET: ci_bootstrap
+        run: |
+          node src/server.js &
+          sleep 2
+
+      - name: Health check
+        run: curl -sSf http://localhost:3001/health
+
+      - name: Login check (admin seed)
+        run: |
+          curl -sSf -X POST http://localhost:3001/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"admin@inventario.com","password":"123456"}' \
+            | grep -q '"token"'
