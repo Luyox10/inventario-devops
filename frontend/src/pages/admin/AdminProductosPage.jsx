@@ -176,9 +176,6 @@ export default function AdminProductosPage() {
           <h2 style={styles.h2}>Productos</h2>
           <p style={styles.p}>Gestiona el catálogo: registrar, editar y eliminar.</p>
         </div>
-        <button onClick={logout} style={styles.logoutBtn}>
-          Cerrar sesión
-        </button>
       </header>
 
       <section style={styles.grid}>

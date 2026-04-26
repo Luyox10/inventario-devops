@@ -346,7 +346,7 @@ const styles = {
     backdropFilter: 'blur(14px)',
   },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  headerActions: { display: 'flex', gap: 10, alignItems: 'center' },
+  headerActions: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' },
   tabs: {
     display: 'flex',
     gap: 8,
