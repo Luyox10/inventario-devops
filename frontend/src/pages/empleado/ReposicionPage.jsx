@@ -1,24 +1,71 @@
-import React, { useState } from 'react';
-import { apiFetch } from '../../api/http';
-import { useAuth } from '../../state/auth/AuthContext';
+import React, { useEffect, useMemo, useState } from 'react';
+
+import { listProductos } from '../../api/productos';
+import { updateStockMovimiento } from '../../api/stock';
+import { useAuth } from '../../state/auth/AuthContext.jsx';
 
 const ReposicionPage = () => {
-  const { token } = useAuth();
-  const [form, setForm] = useState({ producto_id: '', cantidad: '' });
+  const { token, logout } = useAuth();
+  const [form, setForm] = useState({ sku: '', cantidad: '' });
   const [status, setStatus] = useState({ type: '', msg: '' });
+  const [productos, setProductos] = useState([]);
+  const [loadingProductos, setLoadingProductos] = useState(true);
+
+  const productoBySku = useMemo(() => {
+    const map = new Map();
+    for (const p of productos) {
+      const key = String(p.sku || '').trim().toUpperCase();
+      if (key) map.set(key, p);
+    }
+    return map;
+  }, [productos]);
+
+  useEffect(() => {
+    let alive = true;
+
+    async function load() {
+      setLoadingProductos(true);
+      try {
+        const data = await listProductos({ token });
+        if (!alive) return;
+        setProductos(Array.isArray(data) ? data : []);
+      } catch (err) {
+        if (err.status === 401) logout();
+        if (!alive) return;
+        setStatus({ type: 'error', msg: '❌ Error: ' + (err.message || 'No se pudo cargar el catálogo') });
+      } finally {
+        if (!alive) return;
+        setLoadingProductos(false);
+      }
+    }
+
+    load();
+    return () => {
+      alive = false;
+    };
+  }, [token, logout]);
 
   const handleReposicion = async (e) => {
     e.preventDefault();
     setStatus({ type: 'info', msg: 'Procesando...' });
     
     try {
-      await apiFetch(`/stock/reposicion`, {
-        method: 'POST',
-        token: token,
-        body: form
-      });
+      if (loadingProductos) throw new Error('Cargando catálogo de productos...');
+
+      const sku = String(form.sku || '').trim().toUpperCase();
+      if (!sku) throw new Error('SKU inválido');
+
+      const producto = productoBySku.get(sku);
+      if (!producto) throw new Error('SKU no encontrado');
+
+      const productoId = Number(producto.id);
+      const cantidad = Number(form.cantidad);
+      if (!productoId || Number.isNaN(productoId) || productoId <= 0) throw new Error('Producto inválido');
+      if (!cantidad || Number.isNaN(cantidad) || cantidad <= 0) throw new Error('Cantidad inválida');
+
+      await updateStockMovimiento({ token, productoId, tipo: 'ENTRADA', cantidad, motivo: 'Reposición' });
       setStatus({ type: 'success', msg: '✅ Stock actualizado correctamente en el sistema.' });
-      setForm({ producto_id: '', cantidad: '' });
+      setForm({ sku: '', cantidad: '' });
     } catch (error) {
       setStatus({ type: 'error', msg: '❌ Error: ' + error.message });
     }
@@ -55,13 +102,13 @@ const ReposicionPage = () => {
       {/* Formulario Estilizado */}
       <form onSubmit={handleReposicion} style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '400px' }}>
         <div style={styles.inputGroup}>
-          <label style={styles.label}>ID DEL PRODUCTO</label>
+          <label style={styles.label}>SKU DEL PRODUCTO</label>
           <input 
             type="text" 
-            placeholder="Ej: 102" 
+            placeholder="Ej: SKU-001" 
             style={styles.input}
-            value={form.producto_id} 
-            onChange={e => setForm({...form, producto_id: e.target.value})} 
+            value={form.sku} 
+            onChange={e => setForm({ ...form, sku: e.target.value })} 
             required
           />
         </div>
