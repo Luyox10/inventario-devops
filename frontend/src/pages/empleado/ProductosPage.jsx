@@ -1,24 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { apiFetch } from '../../api/http';
-import { useAuth } from '../../state/auth/AuthContext';
+
+import { listProductos } from '../../api/productos';
+import { useAuth } from '../../state/auth/AuthContext.jsx';
 
 const ProductosPage = () => {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     setLoading(true);
-    apiFetch('/productos', { token })
-      .then(data => {
+    setError('');
+    listProductos({ token })
+      .then((data) => {
         setProductos(Array.isArray(data) ? data : []);
-        setLoading(false);
       })
-      .catch(err => {
-        console.error("Error en Capa de Datos:", err);
+      .catch((err) => {
+        if (err.status === 401) logout();
+        setError(err.message || 'Error');
+      })
+      .finally(() => {
         setLoading(false);
       });
-  }, [token]);
+  }, [token, logout]);
 
   return (
     <div>
@@ -35,6 +40,10 @@ const ProductosPage = () => {
       {loading ? (
         <div style={{ textAlign: 'center', color: 'rgba(11, 42, 82, 0.5)', padding: '40px' }}>
           Cargando catálogo...
+        </div>
+      ) : error ? (
+        <div style={{ padding: '12px', borderRadius: 12, background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)', color: '#0b2a52' }}>
+          {error}
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -55,12 +64,12 @@ const ProductosPage = () => {
                     <span style={{
                       padding: '4px 12px',
                       borderRadius: '10px',
-                      backgroundColor: p.stock > 5 ? 'rgba(52, 211, 153, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                      color: p.stock > 5 ? '#065f46' : '#b91c1c',
+                      backgroundColor: Number(p.stock_actual) > 5 ? 'rgba(52, 211, 153, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                      color: Number(p.stock_actual) > 5 ? '#065f46' : '#b91c1c',
                       fontWeight: 'bold',
                       fontSize: '12px'
                     }}>
-                      {p.stock} unidades
+                      {Number(p.stock_actual || 0)} unidades
                     </span>
                   </td>
                 </tr>
