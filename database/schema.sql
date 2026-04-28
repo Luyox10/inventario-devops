@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS productos (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nombre VARCHAR(150) NOT NULL,
   sku VARCHAR(80) NULL,
-  unidad VARCHAR(20) NOT NULL DEFAULT 'und',
   descripcion VARCHAR(255) NULL,
   precio DECIMAL(10,2) NOT NULL,
   stock_actual INT NOT NULL DEFAULT 0,
@@ -84,3 +83,29 @@ CREATE TABLE IF NOT EXISTS movimientos (
   INDEX idx_mov_usuario (usuario_id),
   INDEX idx_mov_created_at (created_at)
 ) ENGINE=InnoDB;
+
+USE inventario;
+ALTER TABLE productos
+ADD COLUMN unidad VARCHAR(20) NOT NULL DEFAULT 'und' AFTER sku;
+
+
+-- PRODUCTOS (incluye unidad/stock)
+SELECT id, nombre, sku, unidad, precio, stock_actual, stock_minimo, activo, created_at
+FROM productos
+ORDER BY id DESC
+LIMIT 50;
+-- USUARIOS
+SELECT id, nombre, email, rol, activo, created_at
+FROM usuarios
+ORDER BY id DESC
+LIMIT 50;
+-- DETALLE DE VENTAS
+SELECT id, venta_id, producto_id, cantidad, precio_unitario, subtotal
+FROM detalle_ventas
+ORDER BY id DESC
+LIMIT 100;
+-- MOVIMIENTOS DE STOCK
+SELECT id, producto_id, tipo, cantidad, motivo, usuario_id, created_at
+FROM movimientos
+ORDER BY id DESC
+LIMIT 100;
