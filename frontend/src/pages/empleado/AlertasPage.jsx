@@ -1,26 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { apiFetch } from '../../api/http';
-import { useAuth } from '../../state/auth/AuthContext';
+
+import { listStockBajo } from '../../api/alertas';
+import { useAuth } from '../../state/auth/AuthContext.jsx';
 
 const AlertasPage = () => {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const [alertas, setAlertas] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    apiFetch('/alertas', { token })
-      .then(data => {
+    setError(null);
+    listStockBajo({ token })
+      .then((data) => {
         setAlertas(Array.isArray(data) ? data : []);
-        setLoading(false);
       })
-      .catch(err => {
-        console.error("Error al obtener alertas:", err);
-        setError("No se pudieron cargar las alertas.");
+      .catch((err) => {
+        if (err.status === 401) logout();
+        setError(err.message || 'No se pudieron cargar las alertas.');
+      })
+      .finally(() => {
         setLoading(false);
       });
-  }, [token]);
+  }, [token, logout]);
 
   return (
     <div>
@@ -87,12 +90,15 @@ const AlertasPage = () => {
                 <div style={{ color: '#0b2a52', fontWeight: 800, fontSize: '16px' }}>
                   {alerta.nombre}
                 </div>
+                <div style={{ marginTop: 4, fontSize: '12px', color: 'rgba(11, 42, 82, 0.6)', fontWeight: 700 }}>
+                  Mínimo: {Number(alerta.stock_minimo || 0)}
+                </div>
               </div>
               
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '12px', color: 'rgba(11, 42, 82, 0.6)' }}>Stock actual</div>
                 <div style={{ fontSize: '20px', fontWeight: 900, color: '#e53e3e' }}>
-                  {alerta.stock} <span style={{ fontSize: '12px', fontWeight: 600 }}>unid.</span>
+                  {Number(alerta.stock_actual || 0)} <span style={{ fontSize: '12px', fontWeight: 600 }}>unid.</span>
                 </div>
               </div>
             </div>
