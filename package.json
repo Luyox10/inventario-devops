@@ -7,11 +7,15 @@
   ],
   "scripts": {
     "dev": "concurrently -n backend,frontend -c blue,green \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+
     "dev:backend": "npm run dev -w backend",
     "dev:frontend": "npm run dev -w frontend",
+
     "start": "npm run start -w backend",
+
     "install:all": "npm install",
-    "test": "echo Pruebas ejecutadas correctamente"
+
+    "test": "npm run test -w backend && npm run test -w frontend"
   },
   "devDependencies": {
     "concurrently": "^9.0.1"
