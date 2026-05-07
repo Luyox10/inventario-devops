@@ -2,10 +2,10 @@ const { verifyToken } = require('../utils/jwt');
 const { httpError } = require('../utils/httpError');
 
 function authMiddleware(req, res, next) {
-  const header = req.headers.authorization || '';
-  const [type, token] = header.split(' ');
+  const header = (req.headers.authorization || '').trim();
+  const [type, token] = header.split(/\s+/, 2);
 
-  if (type !== 'Bearer' || !token) {
+  if (!type || type.toLowerCase() !== 'bearer' || !token) {
     return next(httpError(401, 'Unauthorized'));
   }
 
