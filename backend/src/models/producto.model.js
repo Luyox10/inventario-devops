@@ -75,12 +75,55 @@ async function updateProducto(id, { nombre, sku, unidad, descripcion, precio, st
   return getProductoById(id);
 }
 
-async function deleteProductoSoft(id) {
-  const existing = await getProductoById(id);
-  if (!existing) return null;
+function normalizeProductoId(id) {
+  const pid = Number.parseInt(String(id), 10);
+  if (!Number.isFinite(pid) || pid <= 0) return null;
+  return pid;
+}
 
-  await pool.query('UPDATE productos SET activo = 0 WHERE id = ?', [id]);
-  return getProductoById(id);
+/**
+ * Elimina el producto: borrado físico si no hay referencias en ventas/movimientos;
+ * si hay historial, baja lógica (activo = 0). Todo en una conexión para lecturas coherentes (TiDB).
+ */
+async function deleteProductoSoft(id) {
+  const pid = normalizeProductoId(id);
+  if (pid == null) return null;
+
+  const conn = await pool.getConnection();
+  try {
+    const [existingRows] = await conn.query(
+      'SELECT id FROM productos WHERE id = ? LIMIT 1',
+      [pid]
+    );
+    if (!existingRows.length) return null;
+
+    const [[dv]] = await conn.query(
+      'SELECT COUNT(*) AS c FROM detalle_ventas WHERE producto_id = ?',
+      [pid]
+    );
+    const [[mv]] = await conn.query(
+      'SELECT COUNT(*) AS c FROM movimientos WHERE producto_id = ?',
+      [pid]
+    );
+    const refCount = Number(dv.c || 0) + Number(mv.c || 0);
+
+    if (refCount === 0) {
+      const [delRes] = await conn.query('DELETE FROM productos WHERE id = ?', [pid]);
+      if (!delRes.affectedRows) return null;
+      return { id: pid, eliminado: true, permanente: true };
+    }
+
+    await conn.query('UPDATE productos SET activo = 0 WHERE id = ?', [pid]);
+
+    const [rows] = await conn.query(
+      `SELECT id, nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo, activo, created_at, updated_at
+       FROM productos WHERE id = ? LIMIT 1`,
+      [pid]
+    );
+    return rows[0] || null;
+  } finally {
+    conn.release();
+  }
 }
 
 async function updateStockCantidad(id, stock_actual) {
