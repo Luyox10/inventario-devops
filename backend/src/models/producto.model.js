@@ -22,22 +22,25 @@ async function getProductoById(id) {
   return rows[0] || null;
 }
 
-async function createProducto({ nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo }) {
-  const [result] = await pool.query(
-    `INSERT INTO productos (nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo, activo)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+async function createProducto(data) {
+  const [result] = await db.query(
+    `INSERT INTO productos (nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
-      nombre,
-      sku || null,
-      unidad || 'und',
-      descripcion || null,
-      precio,
-      Number(stock_actual || 0),
-      Number(stock_minimo || 0),
+      data.nombre,
+      data.sku,
+      data.unidad,
+      data.descripcion,
+      data.precio,
+      data.stock_actual,
+      data.stock_minimo
     ]
   );
 
-  return getProductoById(result.insertId);
+  return {
+    id: result.insertId,
+    ...data
+  };
 }
 
 async function updateProducto(id, { nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo, activo }) {

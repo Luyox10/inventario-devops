@@ -15,7 +15,13 @@ async function create(data) {
   if (!data || !data.nombre || data.precio == null) {
     throw httpError(400, 'Datos inválidos');
   }
-  return productoModel.createProducto(data);
+  const created = await productoModel.createProducto(data);
+
+if (!created || !created.id) {
+  throw httpError(500, 'Error creando producto');
+}
+
+return created;
 }
 
 async function update(id, data) {
