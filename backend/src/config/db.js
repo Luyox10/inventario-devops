@@ -36,9 +36,15 @@ function getSslConfig() {
 }
 
 function getDbConfig() {
+  const requiredVars = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_NAME'];
+  const missingVars = requiredVars.filter((key) => !process.env[key]);
+  if (missingVars.length > 0) {
+    throw new Error(`Missing required DB environment variables: ${missingVars.join(', ')}`);
+  }
+
   return {
-    host: process.env.DB_HOST || 'gateway01.us-east-1.prod.aws.tidbcloud.com',
-    port: Number(process.env.DB_PORT || 4000),
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT),
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD || undefined,
     database: process.env.DB_NAME,
