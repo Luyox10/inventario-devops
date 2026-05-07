@@ -5,8 +5,8 @@ USE inventario;
 
 INSERT INTO usuarios (nombre, email, password_hash, rol, activo)
 VALUES
-('Admin', 'admin@inventario.com', '$2a$10$ux.zYE139Lm6AQdzyp0.3.Rhb.JoNyVHucoEgKchdFE22y5eD8cxm', 'ADMIN', 1),
-('Empleado', 'empleado@inventario.com', '$2a$10$fnjBCVe0WZSEJlpqQssyXeYQ5YYpxuBwnpndU5a/vOzfrw0kxb1Ai', 'EMPLEADO', 1)
+('Admin', 'admin@inventario.com', '$2a$10$cl0EtRLgETfk.cTBY7NQoeEeK4C9YQE/0VC2EGOL0CN0I4qvenOTy', 'ADMIN', 1),
+('Empleado', 'empleado@inventario.com', '$2a$10$ta7/ryBL5/qMyxGG/H3DTO9rH8hyDDZQ.bUII4UXHpIRnnmDKguBK', 'EMPLEADO', 1)
 ON DUPLICATE KEY UPDATE
   nombre = VALUES(nombre),
   password_hash = VALUES(password_hash),
