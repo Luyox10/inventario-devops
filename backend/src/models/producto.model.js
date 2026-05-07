@@ -86,10 +86,15 @@ async function createProducto(data) {
       ]
     );
   } catch (err) {
-    process.stderr.write(
-      `[producto.model:createProducto] insert failed payload=${JSON.stringify(payload)} code=${err?.code || ''} errno=${err?.errno ?? ''} sqlState=${err?.sqlState || ''}\n`
-    );
-    if (err?.sqlMessage) process.stderr.write(`[producto.model:createProducto] sqlMessage=${err.sqlMessage}\n`);
+    console.error('[producto.model:createProducto] insert failed', {
+      payload,
+      message: err?.message,
+      code: err?.code,
+      errno: err?.errno,
+      sqlState: err?.sqlState,
+      sqlMessage: err?.sqlMessage,
+      stack: err?.stack,
+    });
     throw err;
   }
 
