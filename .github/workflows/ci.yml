@@ -81,11 +81,25 @@ jobs:
       - name: Apply seed data
         run: mysql -h 127.0.0.1 -uroot -prootpass < database/seed.sql
 
+      - name: Diagnose CI database state
+        run: |
+          echo "MySQL version and SQL mode:"
+          mysql -h 127.0.0.1 -uroot -prootpass -e "SELECT VERSION() AS version, @@sql_mode AS sql_mode;"
+          echo "Productos table definition:"
+          mysql -h 127.0.0.1 -uroot -prootpass inventario -e "DESCRIBE productos;"
+          mysql -h 127.0.0.1 -uroot -prootpass inventario -e "SHOW CREATE TABLE productos\G"
+          echo "Seed sanity checks:"
+          mysql -h 127.0.0.1 -uroot -prootpass inventario -e "SELECT COUNT(*) AS usuarios_count FROM usuarios;"
+          mysql -h 127.0.0.1 -uroot -prootpass inventario -e "SELECT email, rol, activo FROM usuarios ORDER BY id;"
+
       - name: Start API (background)
         working-directory: backend
         run: |
-          node src/server.js &
+          node src/server.js > /tmp/backend-ci.log 2>&1 &
+          echo $! > /tmp/backend-ci.pid
           sleep 10
+          echo "Backend startup log:"
+          tail -n 120 /tmp/backend-ci.log || true
 
       - name: Health check
         run: curl -sSf http://localhost:3001/health
@@ -106,6 +120,7 @@ jobs:
 
       - name: Productos CRUD (admin)
         run: |
+          trap 'echo "Backend log on failure:"; tail -n 200 /tmp/backend-ci.log || true' ERR
           ADMIN_TOKEN=""
           for i in {1..10}; do
             LOGIN_RAW=$(curl -sS -w "\n%{http_code}" -X POST http://localhost:3001/api/auth/login \

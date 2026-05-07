@@ -31,6 +31,7 @@ async function getById(req, res, next) {
 
 async function create(req, res, next) {
   try {
+    process.stderr.write(`[producto.controller:create] payload=${JSON.stringify(req.body || {})}\n`);
     const created = await productoService.create(req.body);
     res.status(201).json(created);
   } catch (err) {
