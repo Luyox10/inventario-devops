@@ -7,19 +7,17 @@ function errorMiddleware(err, req, res, next) {
     message = 'Registro duplicado';
   }
 
-  if (process.env.NODE_ENV !== 'test') {
-    console.error('[error.middleware]', {
-      method: req.method,
-      url: req.originalUrl,
-      status,
-      message: err?.message || message,
-      code: err?.code,
-      errno: err?.errno,
-      sqlState: err?.sqlState,
-      sqlMessage: err?.sqlMessage,
-      stack: err?.stack,
-    });
-  }
+  console.error('[error.middleware]', {
+    method: req.method,
+    url: req.originalUrl,
+    status,
+    message: err?.message || message,
+    code: err?.code,
+    errno: err?.errno,
+    sqlState: err?.sqlState,
+    sqlMessage: err?.sqlMessage,
+    stack: err?.stack,
+  });
 
   res.status(status).json({ message });
 }
