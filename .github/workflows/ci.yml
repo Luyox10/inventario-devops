@@ -125,14 +125,21 @@ jobs:
             exit 1
           fi
           SKU="SKU-CI-ARROZ-${GITHUB_RUN_ID:-0}-${GITHUB_RUN_ATTEMPT:-0}"
-          CREATED=$(curl -sS -X POST http://localhost:3001/api/productos \
+          CREATED_RAW=$(curl -sS -w "\n%{http_code}" -X POST http://localhost:3001/api/productos \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${ADMIN_TOKEN}" \
-            -d "{\"nombre\":\"Arroz\",\"sku\":\"${SKU}\",\"unidad\":\"kg\",\"descripcion\":\"CI\",\"precio\":10.50,\"stock_actual\":5,\"stock_minimo\":1}" || true)
-          PRODUCT_ID=$(echo "$CREATED" | node -e "let s=''; process.stdin.on('data',d=>s+=d).on('end',()=>{try{const j=JSON.parse(s); process.stdout.write(String((j&&j.id)||''));}catch{process.stdout.write('');}})")
+            -d "{\"nombre\":\"Arroz\",\"sku\":\"${SKU}\",\"unidad\":\"kg\",\"descripcion\":\"CI\",\"precio\":10.50,\"stock_actual\":5,\"stock_minimo\":1}")
+          CREATED_STATUS=$(echo "$CREATED_RAW" | tail -n 1)
+          CREATED_RESPONSE=$(echo "$CREATED_RAW" | sed '$d')
+          PRODUCT_ID=$(echo "$CREATED_RESPONSE" | jq -r '.id // empty' 2>/dev/null || true)
+          if [ "$CREATED_STATUS" != "201" ] && [ "$CREATED_STATUS" != "200" ]; then
+            echo "Error creando producto (status: ${CREATED_STATUS}). Respuesta:"
+            echo "$CREATED_RESPONSE"
+            exit 1
+          fi
           if [ -z "$PRODUCT_ID" ]; then
             echo "No se pudo crear producto. Respuesta:"
-            echo "$CREATED"
+            echo "$CREATED_RESPONSE"
             exit 1
           fi
 
