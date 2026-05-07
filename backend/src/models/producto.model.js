@@ -23,7 +23,7 @@ async function getProductoById(id) {
 }
 
 async function createProducto(data) {
-  const [result] = await db.query(
+  const [result] = await pool.query(
     `INSERT INTO productos (nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
