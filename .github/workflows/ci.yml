@@ -87,6 +87,7 @@ jobs:
           DB_USER: root
           DB_PASSWORD: rootpass
           DB_NAME: inventario
+          DB_SSL_REQUIRED: "false"
           JWT_SECRET: ci_secret
           JWT_EXPIRES_IN: 1d
           BOOTSTRAP_SECRET: ci_bootstrap
