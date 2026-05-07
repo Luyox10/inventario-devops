@@ -92,10 +92,10 @@ jobs:
           BOOTSTRAP_SECRET: ci_bootstrap
         run: |
           node src/server.js &
-          sleep 2
+          sleep 10
 
       - name: Health check
-        run: curl -sSf http://localhost:3000/health
+        run: curl -sSf http://localhost:3001/health
 
       - name: Login check (admin seed)
         run: |
