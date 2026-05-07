@@ -91,6 +91,7 @@ jobs:
           echo "Seed sanity checks:"
           mysql -h 127.0.0.1 -uroot -prootpass inventario -e "SELECT COUNT(*) AS usuarios_count FROM usuarios;"
           mysql -h 127.0.0.1 -uroot -prootpass inventario -e "SELECT email, rol, activo FROM usuarios ORDER BY id;"
+          mysql -h 127.0.0.1 -uroot -prootpass inventario -e "SHOW COLUMNS FROM productos;"
 
       - name: Start API (background)
         working-directory: backend
