@@ -70,19 +70,28 @@ async function createProducto(data) {
     throw new Error('Invalid producto payload for insert');
   }
 
-  const [result] = await pool.query(
-    `INSERT INTO productos (nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [
-      payload.nombre,
-      payload.sku,
-      payload.unidad,
-      payload.descripcion,
-      payload.precio,
-      payload.stock_actual,
-      payload.stock_minimo
-    ]
-  );
+  let result;
+  try {
+    [result] = await pool.query(
+      `INSERT INTO productos (nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        payload.nombre,
+        payload.sku,
+        payload.unidad,
+        payload.descripcion,
+        payload.precio,
+        payload.stock_actual,
+        payload.stock_minimo
+      ]
+    );
+  } catch (err) {
+    process.stderr.write(
+      `[producto.model:createProducto] insert failed payload=${JSON.stringify(payload)} code=${err?.code || ''} errno=${err?.errno ?? ''} sqlState=${err?.sqlState || ''}\n`
+    );
+    if (err?.sqlMessage) process.stderr.write(`[producto.model:createProducto] sqlMessage=${err.sqlMessage}\n`);
+    throw err;
+  }
 
   return {
     id: result.insertId,
