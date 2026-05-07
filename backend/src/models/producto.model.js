@@ -1,5 +1,47 @@
 const { pool } = require('../config/db');
 
+function toNullableTrimmedString(value) {
+  if (value == null) return null;
+  const str = String(value).trim();
+  return str.length > 0 ? str : null;
+}
+
+function toRequiredTrimmedString(value, fallback = '') {
+  if (value == null) return fallback;
+  const str = String(value).trim();
+  return str.length > 0 ? str : fallback;
+}
+
+function toSafeInt(value, fallback = 0) {
+  if (value == null || value === '') return fallback;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.max(0, Math.trunc(num));
+}
+
+function toSafeDecimal(value, fallback = 0) {
+  if (value == null || value === '') return fallback;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Number(num.toFixed(2));
+}
+
+function normalizeCreateProductoInput(data) {
+  const nombre = toRequiredTrimmedString(data?.nombre);
+  const precio = toSafeDecimal(data?.precio, NaN);
+  if (!nombre || !Number.isFinite(precio) || precio < 0) return null;
+
+  return {
+    nombre,
+    sku: toNullableTrimmedString(data?.sku),
+    unidad: toRequiredTrimmedString(data?.unidad, 'und'),
+    descripcion: toNullableTrimmedString(data?.descripcion),
+    precio,
+    stock_actual: toSafeInt(data?.stock_actual, 0),
+    stock_minimo: toSafeInt(data?.stock_minimo, 0),
+  };
+}
+
 async function listProductos({ includeInactive = false } = {}) {
   const where = includeInactive ? '' : 'WHERE activo = 1';
   const [rows] = await pool.query(
@@ -23,23 +65,28 @@ async function getProductoById(id) {
 }
 
 async function createProducto(data) {
+  const payload = normalizeCreateProductoInput(data);
+  if (!payload) {
+    throw new Error('Invalid producto payload for insert');
+  }
+
   const [result] = await pool.query(
     `INSERT INTO productos (nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
-      data.nombre,
-      data.sku,
-      data.unidad,
-      data.descripcion,
-      data.precio,
-      data.stock_actual,
-      data.stock_minimo
+      payload.nombre,
+      payload.sku,
+      payload.unidad,
+      payload.descripcion,
+      payload.precio,
+      payload.stock_actual,
+      payload.stock_minimo
     ]
   );
 
   return {
     id: result.insertId,
-    ...data
+    ...payload
   };
 }
 
