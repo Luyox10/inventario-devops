@@ -95,7 +95,7 @@ jobs:
           sleep 2
 
       - name: Health check
-        run: curl -sSf http://localhost:3001/health
+        run: curl -sSf http://localhost:3000/health
 
       - name: Login check (admin seed)
         run: |
