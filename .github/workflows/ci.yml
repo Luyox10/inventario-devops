@@ -64,6 +64,10 @@ jobs:
         working-directory: backend
         run: npm ci
 
+      - name: Prepare backend env for CI
+        working-directory: backend
+        run: cp .env.test .env
+
       - name: Wait for MySQL
         run: |
           for i in {1..30}; do
@@ -79,18 +83,6 @@ jobs:
 
       - name: Start API (background)
         working-directory: backend
-        env:
-          PORT: 3001
-          CORS_ORIGIN: "*"
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_USER: root
-          DB_PASSWORD: rootpass
-          DB_NAME: inventario
-          DB_SSL_REQUIRED: "false"
-          JWT_SECRET: ci_secret
-          JWT_EXPIRES_IN: 1d
-          BOOTSTRAP_SECRET: ci_bootstrap
         run: |
           node src/server.js &
           sleep 10
