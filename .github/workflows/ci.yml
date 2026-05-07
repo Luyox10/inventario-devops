@@ -130,17 +130,21 @@ jobs:
             echo "$LOGIN_RESPONSE"
             exit 1
           fi
-
-          CREATED=$(curl -sSf -X POST http://localhost:3001/api/productos \
+          SKU="SKU-CI-ARROZ-${GITHUB_RUN_ID:-0}-${GITHUB_RUN_ATTEMPT:-0}"
+          CREATED=$(curl -sS -X POST http://localhost:3001/api/productos \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${ADMIN_TOKEN}" \
-            -d '{"nombre":"Arroz","sku":"SKU-CI-ARROZ","unidad":"kg","descripcion":"CI","precio":10.50,"stock_actual":5,"stock_minimo":1}')
-
-          PRODUCT_ID=$(echo "$CREATED" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+            -d "{\"nombre\":\"Arroz\",\"sku\":\"${SKU}\",\"unidad\":\"kg\",\"descripcion\":\"CI\",\"precio\":10.50,\"stock_actual\":5,\"stock_minimo\":1}" || true)
+          PRODUCT_ID=$(echo "$CREATED" | node -e "let s=''; process.stdin.on('data',d=>s+=d).on('end',()=>{try{const j=JSON.parse(s); process.stdout.write(String((j&&j.id)||''));}catch{process.stdout.write('');}})")
+          if [ -z "$PRODUCT_ID" ]; then
+            echo "No se pudo crear producto. Respuesta:"
+            echo "$CREATED"
+            exit 1
+          fi
 
           curl -sSf http://localhost:3001/api/productos \
             -H "Authorization: Bearer ${ADMIN_TOKEN}" \
-            | grep -q 'SKU-CI-ARROZ'
+            | grep -q "${SKU}"
 
           curl -sSf -X PUT http://localhost:3001/api/productos/${PRODUCT_ID} \
             -H "Content-Type: application/json" \
