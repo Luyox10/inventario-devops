@@ -1,5 +1,23 @@
 const { pool } = require('../config/db');
 
+function isDateOnly(s) {
+  return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+function normalizeFromTo({ from, to }) {
+  const next = { from, to };
+
+  if (isDateOnly(next.from)) {
+    next.from = `${next.from} 00:00:00`;
+  }
+
+  if (isDateOnly(next.to)) {
+    next.to = `${next.to} 23:59:59`;
+  }
+
+  return next;
+}
+
 async function createVenta(connection, { usuario_id, total }) {
   const [result] = await connection.query(
     'INSERT INTO ventas (usuario_id, total) VALUES (?, ?)',
@@ -37,25 +55,33 @@ async function createMovimiento(connection, { producto_id, usuario_id, venta_id,
 }
 
 async function listVentas({ from, to } = {}) {
+  const norm = normalizeFromTo({ from, to });
   const params = [];
   const where = [];
 
-  if (from) {
-    where.push('created_at >= ?');
-    params.push(from);
+  if (norm.from) {
+    where.push('v.created_at >= ?');
+    params.push(norm.from);
   }
-  if (to) {
-    where.push('created_at <= ?');
-    params.push(to);
+  if (norm.to) {
+    where.push('v.created_at <= ?');
+    params.push(norm.to);
   }
 
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
   const [rows] = await pool.query(
-    `SELECT id, usuario_id, total, created_at
-     FROM ventas
+    `SELECT v.id,
+            v.usuario_id,
+            u.nombre AS usuario_nombre,
+            u.email AS usuario_email,
+            u.rol AS usuario_rol,
+            v.total,
+            v.created_at
+     FROM ventas v
+     INNER JOIN usuarios u ON u.id = v.usuario_id
      ${whereSql}
-     ORDER BY created_at DESC`,
+     ORDER BY v.created_at DESC`,
     params
   );
 
