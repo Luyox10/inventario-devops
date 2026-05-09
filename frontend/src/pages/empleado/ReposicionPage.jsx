@@ -6,19 +6,38 @@ import { useAuth } from '../../state/auth/AuthContext.jsx';
 
 const ReposicionPage = () => {
   const { token, logout } = useAuth();
-  const [form, setForm] = useState({ sku: '', cantidad: '' });
+  const [form, setForm] = useState({ cantidad: '' });
   const [status, setStatus] = useState({ type: '', msg: '' });
   const [productos, setProductos] = useState([]);
   const [loadingProductos, setLoadingProductos] = useState(true);
 
-  const productoBySku = useMemo(() => {
+  const [productoId, setProductoId] = useState('');
+  const [productoQuery, setProductoQuery] = useState('');
+  const [productoOpen, setProductoOpen] = useState(false);
+
+  const productoById = useMemo(() => {
     const map = new Map();
     for (const p of productos) {
-      const key = String(p.sku || '').trim().toUpperCase();
-      if (key) map.set(key, p);
+      map.set(String(p.id), p);
     }
     return map;
   }, [productos]);
+
+  const productoMatches = useMemo(() => {
+    const s = productoQuery.trim().toLowerCase();
+    if (!s) return [];
+    const matches = productos.filter((p) => {
+      const nombre = String(p.nombre || '').toLowerCase();
+      const sku = String(p.sku || '').toLowerCase();
+      return nombre.includes(s) || sku.includes(s);
+    });
+    return matches.slice(0, 10);
+  }, [productoQuery, productos]);
+
+  const productoSelected = useMemo(() => {
+    if (!productoId) return null;
+    return productoById.get(String(productoId)) || null;
+  }, [productoById, productoId]);
 
   useEffect(() => {
     let alive = true;
@@ -52,11 +71,16 @@ const ReposicionPage = () => {
     try {
       if (loadingProductos) throw new Error('Cargando catálogo de productos...');
 
-      const sku = String(form.sku || '').trim().toUpperCase();
-      if (!sku) throw new Error('SKU inválido');
+      let producto = productoSelected;
+      if (!producto) {
+        const q = productoQuery.trim().toLowerCase();
+        if (!q) throw new Error('Selecciona un producto');
 
-      const producto = productoBySku.get(sku);
-      if (!producto) throw new Error('SKU no encontrado');
+        const exactSku = productos.find((p) => String(p.sku || '').trim().toLowerCase() === q);
+        if (exactSku) producto = exactSku;
+      }
+
+      if (!producto) throw new Error('Producto no encontrado');
 
       const productoId = Number(producto.id);
       const cantidad = Number(form.cantidad);
@@ -65,7 +89,11 @@ const ReposicionPage = () => {
 
       await updateStockMovimiento({ token, productoId, tipo: 'ENTRADA', cantidad, motivo: 'Reposición' });
       setStatus({ type: 'success', msg: '✅ Stock actualizado correctamente en el sistema.' });
-      setForm({ sku: '', cantidad: '' });
+
+      setProductoId('');
+      setProductoQuery('');
+      setProductoOpen(false);
+      setForm({ cantidad: '' });
     } catch (error) {
       setStatus({ type: 'error', msg: '❌ Error: ' + error.message });
     }
@@ -102,15 +130,51 @@ const ReposicionPage = () => {
       {/* Formulario Estilizado */}
       <form onSubmit={handleReposicion} style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '400px' }}>
         <div style={styles.inputGroup}>
-          <label style={styles.label}>SKU DEL PRODUCTO</label>
-          <input 
-            type="text" 
-            placeholder="Ej: SKU-001" 
-            style={styles.input}
-            value={form.sku} 
-            onChange={e => setForm({ ...form, sku: e.target.value })} 
-            required
-          />
+          <label style={styles.label}>PRODUCTO (SKU O NOMBRE)</label>
+          <div style={styles.autoWrap}>
+            <input
+              type="text"
+              placeholder="Buscar por SKU o nombre..."
+              style={styles.input}
+              value={productoQuery}
+              onChange={(e) => {
+                setProductoQuery(e.target.value);
+                setProductoId('');
+                setProductoOpen(true);
+              }}
+              onFocus={() => setProductoOpen(true)}
+              onBlur={() => setTimeout(() => setProductoOpen(false), 120)}
+              disabled={loadingProductos}
+              required
+            />
+
+            {productoOpen && productoMatches.length > 0 ? (
+              <div style={styles.autoDropdown}>
+                {productoMatches.map((p) => {
+                  const selected = String(p.id) === String(productoId);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      style={{ ...styles.autoItem, ...(selected ? styles.autoItemActive : null) }}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setProductoId(String(p.id));
+                        setProductoQuery(p.sku ? `${p.nombre} (${p.sku})` : p.nombre);
+                        setProductoOpen(false);
+                      }}
+                    >
+                      <div style={styles.autoTitle}>{p.nombre}</div>
+                      <div style={styles.autoMeta}>
+                        {p.sku ? `SKU: ${p.sku}` : 'Sin SKU'}
+                        {p.unidad ? ` · ${p.unidad}` : ''}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <div style={styles.inputGroup}>
@@ -158,6 +222,33 @@ const styles = {
     // Efecto sutil al enfocar
     onFocus: (e) => e.target.style.borderColor = '#0b2a52'
   },
+  autoWrap: { position: 'relative' },
+  autoDropdown: {
+    position: 'absolute',
+    top: 'calc(100% + 8px)',
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    borderRadius: 14,
+    overflow: 'hidden',
+    border: '1px solid rgba(11, 42, 82, 0.14)',
+    background: 'rgba(255, 255, 255, 0.92)',
+    boxShadow: '0 18px 40px rgba(0,0,0,0.18)',
+    maxHeight: 260,
+    overflowY: 'auto',
+  },
+  autoItem: {
+    width: '100%',
+    textAlign: 'left',
+    border: 'none',
+    background: 'transparent',
+    padding: '10px 12px',
+    cursor: 'pointer',
+    borderBottom: '1px solid rgba(11, 42, 82, 0.08)',
+  },
+  autoItemActive: { background: 'rgba(11, 42, 82, 0.08)' },
+  autoTitle: { fontWeight: 900, color: '#0b2a52', fontSize: 13 },
+  autoMeta: { marginTop: 4, fontWeight: 800, color: 'rgba(11, 42, 82, 0.65)', fontSize: 12 },
   button: {
     marginTop: '10px',
     padding: '14px',
