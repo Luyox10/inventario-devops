@@ -4,21 +4,62 @@ import { listProductos } from '../../api/productos';
 import { crearVenta } from '../../api/ventas';
 import { useAuth } from '../../state/auth/AuthContext.jsx';
 
+function formatMoney(n) {
+  const v = Number(n || 0);
+  return `S/ ${v.toFixed(2)}`;
+}
+
 const VentasPage = () => {
   const { token, logout } = useAuth();
-  const [venta, setVenta] = useState({ sku: '', cantidad: '' });
+  const [venta, setVenta] = useState({ cantidad: '' });
   const [status, setStatus] = useState({ type: '', msg: '' });
   const [productos, setProductos] = useState([]);
   const [loadingProductos, setLoadingProductos] = useState(true);
 
-  const productoBySku = useMemo(() => {
+  const [productoId, setProductoId] = useState('');
+  const [productoQuery, setProductoQuery] = useState('');
+  const [productoOpen, setProductoOpen] = useState(false);
+
+  const productoById = useMemo(() => {
     const map = new Map();
     for (const p of productos) {
-      const key = String(p.sku || '').trim().toUpperCase();
-      if (key) map.set(key, p);
+      map.set(String(p.id), p);
     }
     return map;
   }, [productos]);
+
+  const productoMatches = useMemo(() => {
+    const s = productoQuery.trim().toLowerCase();
+    if (!s) return [];
+    const matches = productos.filter((p) => {
+      const nombre = String(p.nombre || '').toLowerCase();
+      const sku = String(p.sku || '').toLowerCase();
+      return nombre.includes(s) || sku.includes(s);
+    });
+    return matches.slice(0, 10);
+  }, [productoQuery, productos]);
+
+  const productoSelected = useMemo(() => {
+    if (!productoId) return null;
+    return productoById.get(String(productoId)) || null;
+  }, [productoById, productoId]);
+
+  const productoResolved = useMemo(() => {
+    if (productoSelected) return productoSelected;
+    const q = productoQuery.trim().toLowerCase();
+    if (!q) return null;
+    const exactSku = productos.find((p) => String(p.sku || '').trim().toLowerCase() === q);
+    if (exactSku) return exactSku;
+    return null;
+  }, [productoQuery, productoSelected, productos]);
+
+  const totalPreview = useMemo(() => {
+    const qty = Number(venta.cantidad);
+    if (!productoResolved) return null;
+    if (!qty || Number.isNaN(qty) || qty <= 0) return null;
+    const precio = Number(productoResolved.precio || 0);
+    return Number((precio * qty).toFixed(2));
+  }, [productoResolved, venta.cantidad]);
 
   useEffect(() => {
     let alive = true;
@@ -52,11 +93,9 @@ const VentasPage = () => {
     try {
       if (loadingProductos) throw new Error('Cargando catálogo de productos...');
 
-      const sku = String(venta.sku || '').trim().toUpperCase();
-      if (!sku) throw new Error('SKU inválido');
+      let producto = productoResolved;
 
-      const producto = productoBySku.get(sku);
-      if (!producto) throw new Error('SKU no encontrado');
+      if (!producto) throw new Error('Producto no encontrado');
 
       const producto_id = Number(producto.id);
       const cantidad = Number(venta.cantidad);
@@ -65,7 +104,11 @@ const VentasPage = () => {
 
       await crearVenta({ token, items: [{ producto_id, cantidad }] });
       setStatus({ type: 'success', msg: '✅ ¡Venta registrada exitosamente!' });
-      setVenta({ sku: '', cantidad: '' });
+
+      setProductoId('');
+      setProductoQuery('');
+      setProductoOpen(false);
+      setVenta({ cantidad: '' });
       
       // Limpiar mensaje después de 3 segundos
       setTimeout(() => setStatus({ type: '', msg: '' }), 3000);
@@ -117,15 +160,51 @@ const VentasPage = () => {
         <form onSubmit={manejarEnvio} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           
           <div style={styles.inputGroup}>
-            <label style={styles.label}>SKU DEL PRODUCTO</label>
-            <input 
-              type="text" 
-              placeholder="Ej: SKU-001" 
-              style={styles.input}
-              value={venta.sku}
-              onChange={(e) => setVenta({ ...venta, sku: e.target.value })}
-              required
-            />
+            <label style={styles.label}>PRODUCTO (SKU O NOMBRE)</label>
+            <div style={styles.autoWrap}>
+              <input
+                type="text"
+                placeholder="Buscar por SKU o nombre..."
+                style={styles.input}
+                value={productoQuery}
+                onChange={(e) => {
+                  setProductoQuery(e.target.value);
+                  setProductoId('');
+                  setProductoOpen(true);
+                }}
+                onFocus={() => setProductoOpen(true)}
+                onBlur={() => setTimeout(() => setProductoOpen(false), 120)}
+                disabled={loadingProductos}
+                required
+              />
+
+              {productoOpen && productoMatches.length > 0 ? (
+                <div style={styles.autoDropdown}>
+                  {productoMatches.map((p) => {
+                    const selected = String(p.id) === String(productoId);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        style={{ ...styles.autoItem, ...(selected ? styles.autoItemActive : null) }}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setProductoId(String(p.id));
+                          setProductoQuery(p.sku ? `${p.nombre} (${p.sku})` : p.nombre);
+                          setProductoOpen(false);
+                        }}
+                      >
+                        <div style={styles.autoTitle}>{p.nombre}</div>
+                        <div style={styles.autoMeta}>
+                          {p.sku ? `SKU: ${p.sku}` : 'Sin SKU'}
+                          {p.unidad ? ` · ${p.unidad}` : ''}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <div style={styles.inputGroup}>
@@ -139,6 +218,20 @@ const VentasPage = () => {
               onChange={(e) => setVenta({...venta, cantidad: e.target.value})}
               required
             />
+          </div>
+
+          <div style={styles.totalBox}>
+            <div style={styles.totalLabel}>TOTAL A COBRAR</div>
+            <div style={styles.totalValue}>{totalPreview == null ? '-' : formatMoney(totalPreview)}</div>
+            {productoResolved ? (
+              <div style={styles.totalMeta}>
+                {productoResolved.nombre}
+                {productoResolved.sku ? ` (${productoResolved.sku})` : ''}
+                {` · ${formatMoney(productoResolved.precio)}`}
+              </div>
+            ) : (
+              <div style={styles.totalMeta}>Selecciona un producto para ver el total.</div>
+            )}
           </div>
 
           <button type="submit" style={styles.button}>
@@ -175,6 +268,57 @@ const styles = {
     color: '#0b2a52',
     outline: 'none',
     boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
+  },
+  autoWrap: { position: 'relative' },
+  autoDropdown: {
+    position: 'absolute',
+    top: 'calc(100% + 8px)',
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    borderRadius: 14,
+    overflow: 'hidden',
+    border: '1px solid rgba(11, 42, 82, 0.14)',
+    background: 'rgba(255, 255, 255, 0.92)',
+    boxShadow: '0 18px 40px rgba(0,0,0,0.18)',
+    maxHeight: 260,
+    overflowY: 'auto',
+  },
+  autoItem: {
+    width: '100%',
+    textAlign: 'left',
+    border: 'none',
+    background: 'transparent',
+    padding: '10px 12px',
+    cursor: 'pointer',
+    borderBottom: '1px solid rgba(11, 42, 82, 0.08)',
+  },
+  autoItemActive: { background: 'rgba(11, 42, 82, 0.08)' },
+  autoTitle: { fontWeight: 900, color: '#0b2a52', fontSize: 13 },
+  autoMeta: { marginTop: 4, fontWeight: 800, color: 'rgba(11, 42, 82, 0.65)', fontSize: 12 },
+  totalBox: {
+    padding: '14px 16px',
+    borderRadius: '16px',
+    border: '1px solid rgba(11, 42, 82, 0.10)',
+    background: 'rgba(255, 255, 255, 0.35)',
+  },
+  totalLabel: {
+    fontSize: 11,
+    fontWeight: 900,
+    color: 'rgba(11, 42, 82, 0.6)',
+    letterSpacing: '0.5px',
+  },
+  totalValue: {
+    marginTop: 6,
+    fontSize: 22,
+    fontWeight: 1000,
+    color: '#0b2a52',
+  },
+  totalMeta: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: 800,
+    color: 'rgba(11, 42, 82, 0.70)',
   },
   button: {
     marginTop: '10px',
