@@ -119,53 +119,53 @@ jobs:
             -d '{"email":"empleado@inventario.com","password":"123456"}' \
             | grep -q '"token"'
 
-- name: Productos CRUD (admin)
-  run: |
-    trap 'echo "Backend log on failure:"; tail -n 200 /tmp/backend-ci.log || true' ERR
+      - name: Productos CRUD (admin)
+        run: |
+          trap 'echo "Backend log on failure:"; tail -n 200 /tmp/backend-ci.log || true' ERR
 
-    # Login admin
-    ADMIN_TOKEN=$(curl -s -X POST http://localhost:3001/api/auth/login \
-      -H "Content-Type: application/json" \
-      -d '{"email":"admin@inventario.com","password":"123456"}' \
-      | jq -r '.token')
+          # Login admin
+          ADMIN_TOKEN=$(curl -s -X POST http://localhost:3001/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"admin@inventario.com","password":"123456"}' \
+            | jq -r '.token')
 
-    if [ -z "$ADMIN_TOKEN" ] || [ "$ADMIN_TOKEN" = "null" ]; then
-      echo "No se pudo obtener token admin"
-      exit 1
-    fi
+          if [ -z "$ADMIN_TOKEN" ] || [ "$ADMIN_TOKEN" = "null" ]; then
+            echo "No se pudo obtener token admin"
+            exit 1
+          fi
 
-    SKU="SKU-CI-${GITHUB_RUN_ID}"
+          SKU="SKU-CI-${GITHUB_RUN_ID}"
 
-    echo "=== CREAR PRODUCTO ==="
-    CREATE_RESPONSE=$(curl -s -X POST http://localhost:3001/api/productos \
-      -H "Content-Type: application/json" \
-      -H "Authorization: Bearer ${ADMIN_TOKEN}" \
-      -d "{\"nombre\":\"Arroz\",\"sku\":\"${SKU}\",\"unidad\":\"kg\",\"descripcion\":\"CI\",\"precio\":10.50,\"stock_actual\":5,\"stock_minimo\":1}")
+          echo "=== CREAR PRODUCTO ==="
+          CREATE_RESPONSE=$(curl -s -X POST http://localhost:3001/api/productos \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            -d "{\"nombre\":\"Arroz\",\"sku\":\"${SKU}\",\"unidad\":\"kg\",\"descripcion\":\"CI\",\"precio\":10.50,\"stock_actual\":5,\"stock_minimo\":1}")
 
-    echo "$CREATE_RESPONSE"
+          echo "$CREATE_RESPONSE"
 
-    PRODUCT_ID=$(echo "$CREATE_RESPONSE" | jq -r '.id')
+          PRODUCT_ID=$(echo "$CREATE_RESPONSE" | jq -r '.id')
 
-    if [ -z "$PRODUCT_ID" ] || [ "$PRODUCT_ID" = "null" ]; then
-      echo "No se pudo crear producto"
-      exit 1
-    fi
+          if [ -z "$PRODUCT_ID" ] || [ "$PRODUCT_ID" = "null" ]; then
+            echo "No se pudo crear producto"
+            exit 1
+          fi
 
-    echo "=== LISTAR PRODUCTOS ==="
-    curl -s http://localhost:3001/api/productos \
-      -H "Authorization: Bearer ${ADMIN_TOKEN}"
+          echo "=== LISTAR PRODUCTOS ==="
+          curl -s http://localhost:3001/api/productos \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}"
 
-    echo "=== ACTUALIZAR PRODUCTO ==="
-    curl -s -X PUT http://localhost:3001/api/productos/${PRODUCT_ID} \
-      -H "Content-Type: application/json" \
-      -H "Authorization: Bearer ${ADMIN_TOKEN}" \
-      -d '{"precio":11.00}'
+          echo "=== ACTUALIZAR PRODUCTO ==="
+          curl -s -X PUT http://localhost:3001/api/productos/${PRODUCT_ID} \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            -d '{"precio":11.00}'
 
-    echo "=== ELIMINAR PRODUCTO ==="
-    curl -s -X DELETE http://localhost:3001/api/productos/${PRODUCT_ID} \
-      -H "Authorization: Bearer ${ADMIN_TOKEN}"
+          echo "=== ELIMINAR PRODUCTO ==="
+          curl -s -X DELETE http://localhost:3001/api/productos/${PRODUCT_ID} \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}"
 
-    echo "CRUD completado correctamente"'
+          echo "CRUD completado correctamente"
 
       - name: Reportes dashboard (admin)
         run: |
