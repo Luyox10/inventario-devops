@@ -21,6 +21,8 @@ export default function AdminVentasPage() {
   const [error, setError] = useState('');
 
   const [productoId, setProductoId] = useState('');
+  const [productoQuery, setProductoQuery] = useState('');
+  const [productoOpen, setProductoOpen] = useState(false);
   const [cantidad, setCantidad] = useState('1');
   const [cart, setCart] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -28,16 +30,93 @@ export default function AdminVentasPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
 
+  const [histSort, setHistSort] = useState({ key: 'created_at', dir: 'desc' });
+  const [histPageSize, setHistPageSize] = useState(10);
+  const [histPage, setHistPage] = useState(1);
+
   const total = useMemo(() => {
     const sum = cart.reduce((acc, it) => acc + Number(it.subtotal || 0), 0);
     return Number(sum.toFixed(2));
   }, [cart]);
+
+  function toggleHistSort(key) {
+    setHistSort((prev) => {
+      if (prev.key !== key) {
+        const initialDir = key === 'created_at' ? 'desc' : 'asc';
+        return { key, dir: initialDir };
+      }
+      return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+    });
+  }
+
+  function histSortLabel(key, label) {
+    if (histSort.key !== key) return label;
+    return `${label} ${histSort.dir === 'asc' ? '↑' : '↓'}`;
+  }
+
+  const historialSorted = useMemo(() => {
+    const dirMul = histSort.dir === 'desc' ? -1 : 1;
+    const arr = [...historial];
+    arr.sort((a, b) => {
+      if (histSort.key === 'id') return (Number(a.id || 0) - Number(b.id || 0)) * dirMul;
+      if (histSort.key === 'usuario') {
+        const au = String(a.usuario_nombre || a.usuario_email || a.usuario_id || '');
+        const bu = String(b.usuario_nombre || b.usuario_email || b.usuario_id || '');
+        return au.localeCompare(bu, 'es', { sensitivity: 'base' }) * dirMul;
+      }
+      if (histSort.key === 'rol') {
+        const ar = String(a.usuario_rol || '');
+        const br = String(b.usuario_rol || '');
+        return ar.localeCompare(br, 'es', { sensitivity: 'base' }) * dirMul;
+      }
+      if (histSort.key === 'total') return (Number(a.total || 0) - Number(b.total || 0)) * dirMul;
+      if (histSort.key === 'created_at') return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * dirMul;
+      return 0;
+    });
+    return arr;
+  }, [histSort.dir, histSort.key, historial]);
+
+  function rolBadgeStyle(rol) {
+    if (rol === 'ADMIN') return styles.roleAdmin;
+    if (rol === 'EMPLEADO') return styles.roleEmpleado;
+    return styles.roleUnknown;
+  }
+
+  const histTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(historialSorted.length / histPageSize)),
+    [histPageSize, historialSorted.length]
+  );
+
+  useEffect(() => {
+    setHistPage((p) => Math.min(Math.max(1, p), histTotalPages));
+  }, [histTotalPages]);
+
+  const historialPaged = useMemo(() => {
+    const start = (histPage - 1) * histPageSize;
+    return historialSorted.slice(start, start + histPageSize);
+  }, [histPage, histPageSize, historialSorted]);
 
   const productoById = useMemo(() => {
     const map = new Map();
     for (const p of productos) map.set(String(p.id), p);
     return map;
   }, [productos]);
+
+  const productoMatches = useMemo(() => {
+    const s = productoQuery.trim().toLowerCase();
+    if (!s) return [];
+    const matches = productos.filter((p) => {
+      const nombre = String(p.nombre || '').toLowerCase();
+      const sku = String(p.sku || '').toLowerCase();
+      return nombre.includes(s) || sku.includes(s);
+    });
+    return matches.slice(0, 12);
+  }, [productoQuery, productos]);
+
+  const productoSelected = useMemo(() => {
+    if (!productoId) return null;
+    return productoById.get(String(productoId)) || null;
+  }, [productoById, productoId]);
 
   async function refreshProductos() {
     setError('');
@@ -106,6 +185,10 @@ export default function AdminVentasPage() {
 
       return [...prev, { producto_id: p.id, nombre: p.nombre, unidad: p.unidad, cantidad: qty, precio_unitario: precio, subtotal }];
     });
+
+    setProductoId('');
+    setProductoQuery('');
+    setProductoOpen(false);
   }
 
   function removeItem(producto_id) {
@@ -154,14 +237,49 @@ export default function AdminVentasPage() {
           <div style={styles.row}>
             <label style={styles.label}>
               Producto
-              <select value={productoId} onChange={(e) => setProductoId(e.target.value)} style={styles.select} disabled={loadingProductos}>
-                <option value="">Selecciona...</option>
-                {productos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre} ({p.unidad || 'und'}) - Stock: {p.stock_actual}
-                  </option>
-                ))}
-              </select>
+              <div style={styles.autocompleteWrap}>
+                <input
+                  value={productoQuery}
+                  onChange={(e) => {
+                    setProductoQuery(e.target.value);
+                    setProductoOpen(true);
+                    setProductoId('');
+                  }}
+                  onFocus={() => setProductoOpen(true)}
+                  onBlur={() => setTimeout(() => setProductoOpen(false), 120)}
+                  placeholder="Buscar por nombre o SKU"
+                  style={styles.input}
+                  disabled={loadingProductos}
+                />
+                {productoSelected ? (
+                  <div style={styles.autocompleteHint}>
+                    Seleccionado: <strong>{productoSelected.nombre}</strong> · Stock {productoSelected.stock_actual}
+                  </div>
+                ) : null}
+
+                {productoOpen && productoMatches.length > 0 ? (
+                  <div style={styles.autocompleteMenu}>
+                    {productoMatches.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        style={styles.autocompleteItem}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setProductoId(String(p.id));
+                          setProductoQuery(`${p.nombre}${p.sku ? ` (${p.sku})` : ''}`);
+                          setProductoOpen(false);
+                        }}
+                      >
+                        <div style={styles.autocompleteTitle}>{p.nombre}</div>
+                        <div style={styles.autocompleteMeta}>
+                          {p.sku ? `SKU: ${p.sku}` : 'SKU: —'} · {p.unidad || 'und'} · Stock {p.stock_actual}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             </label>
 
             <label style={styles.label}>
@@ -246,23 +364,73 @@ export default function AdminVentasPage() {
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>ID</th>
-                    <th style={styles.th}>Usuario</th>
-                    <th style={styles.th}>Total</th>
-                    <th style={styles.th}>Fecha</th>
+                    <th style={{ ...styles.th, ...styles.thClickable }} onClick={() => toggleHistSort('id')}>
+                      {histSortLabel('id', 'ID')}
+                    </th>
+                    <th style={{ ...styles.th, ...styles.thClickable }} onClick={() => toggleHistSort('usuario')}>
+                      {histSortLabel('usuario', 'Usuario')}
+                    </th>
+                    <th style={{ ...styles.th, ...styles.thClickable }} onClick={() => toggleHistSort('rol')}>
+                      {histSortLabel('rol', 'Rol')}
+                    </th>
+                    <th style={{ ...styles.th, ...styles.thClickable }} onClick={() => toggleHistSort('total')}>
+                      {histSortLabel('total', 'Total')}
+                    </th>
+                    <th style={{ ...styles.th, ...styles.thClickable }} onClick={() => toggleHistSort('created_at')}>
+                      {histSortLabel('created_at', 'Fecha')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {historial.map((v) => (
+                  {historialPaged.map((v) => (
                     <tr key={v.id}>
                       <td style={styles.td}>{v.id}</td>
-                      <td style={styles.td}>{v.usuario_id}</td>
+                      <td style={styles.td}>{v.usuario_nombre || v.usuario_email || v.usuario_id}</td>
+                      <td style={styles.td}>
+                        <span style={{ ...styles.roleBadge, ...rolBadgeStyle(v.usuario_rol) }}>{v.usuario_rol || '—'}</span>
+                      </td>
                       <td style={styles.td}>{formatMoney(v.total)}</td>
                       <td style={styles.td}>{new Date(v.created_at).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+
+              <div style={styles.tableFooter}>
+                <div style={styles.footerLeft}>
+                  <span style={styles.footerMuted}>
+                    Mostrando {(histPage - 1) * histPageSize + 1}–{Math.min(histPage * histPageSize, historialSorted.length)} de{' '}
+                    {historialSorted.length}
+                  </span>
+                  <select value={histPageSize} onChange={(e) => setHistPageSize(Number(e.target.value) || 10)} style={styles.selectSmall}>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+                <div style={styles.footerRight}>
+                  <button type="button" style={styles.smallBtn} onClick={() => setHistPage(1)} disabled={histPage <= 1}>
+                    «
+                  </button>
+                  <button type="button" style={styles.smallBtn} onClick={() => setHistPage((p) => Math.max(1, p - 1))} disabled={histPage <= 1}>
+                    ‹
+                  </button>
+                  <span style={styles.footerMuted}>
+                    Página {histPage} / {histTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    style={styles.smallBtn}
+                    onClick={() => setHistPage((p) => Math.min(histTotalPages, p + 1))}
+                    disabled={histPage >= histTotalPages}
+                  >
+                    ›
+                  </button>
+                  <button type="button" style={styles.smallBtn} onClick={() => setHistPage(histTotalPages)} disabled={histPage >= histTotalPages}>
+                    »
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -326,6 +494,33 @@ const styles = {
     background: 'rgba(255,255,255,0.55)',
     color: '#0b2a52',
   },
+  autocompleteWrap: { position: 'relative', minWidth: 280 },
+  autocompleteHint: { marginTop: 6, fontSize: 12, fontWeight: 700, color: 'rgba(11, 42, 82, 0.72)' },
+  autocompleteMenu: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 'calc(100% + 6px)',
+    background: 'rgba(245, 248, 255, 0.98)',
+    border: '1px solid rgba(11, 42, 82, 0.18)',
+    borderRadius: 14,
+    boxShadow: '0 18px 40px rgba(0, 0, 0, 0.22)',
+    overflow: 'hidden',
+    zIndex: 20,
+    maxHeight: 320,
+    overflowY: 'auto',
+  },
+  autocompleteItem: {
+    width: '100%',
+    textAlign: 'left',
+    padding: '10px 12px',
+    border: 'none',
+    borderBottom: '1px solid rgba(11, 42, 82, 0.08)',
+    background: 'transparent',
+    cursor: 'pointer',
+  },
+  autocompleteTitle: { fontWeight: 900, color: '#0b2a52', fontSize: 13 },
+  autocompleteMeta: { marginTop: 4, fontSize: 12, fontWeight: 700, color: 'rgba(11, 42, 82, 0.68)' },
   error: {
     marginTop: 12,
     padding: 10,
@@ -337,6 +532,7 @@ const styles = {
   },
   tableWrap: { overflowX: 'auto', marginTop: 12 },
   table: { width: '100%', borderCollapse: 'collapse' },
+  thClickable: { cursor: 'pointer', userSelect: 'none' },
   th: {
     textAlign: 'left',
     fontSize: 12,
@@ -368,6 +564,48 @@ const styles = {
     whiteSpace: 'nowrap',
     textAlign: 'right',
   },
+  tableFooter: {
+    marginTop: 12,
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  footerLeft: { display: 'flex', alignItems: 'center', gap: 10 },
+  footerRight: { display: 'flex', alignItems: 'center', gap: 6 },
+  footerMuted: { color: 'rgba(11, 42, 82, 0.72)', fontWeight: 800, fontSize: 12 },
+  selectSmall: {
+    padding: '8px 10px',
+    borderRadius: 12,
+    border: '1px solid rgba(11, 42, 82, 0.18)',
+    outline: 'none',
+    background: 'rgba(255,255,255,0.55)',
+    color: '#0b2a52',
+    fontWeight: 800,
+  },
+  smallBtn: {
+    padding: '8px 10px',
+    borderRadius: 12,
+    border: '1px solid rgba(11, 42, 82, 0.22)',
+    background: 'rgba(255,255,255,0.25)',
+    color: '#0b2a52',
+    fontWeight: 900,
+    cursor: 'pointer',
+  },
+  roleBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '4px 10px',
+    borderRadius: 999,
+    fontWeight: 900,
+    fontSize: 11,
+    letterSpacing: 0.6,
+    border: '1px solid rgba(11, 42, 82, 0.15)',
+  },
+  roleAdmin: { background: 'rgba(59, 130, 246, 0.14)', border: '1px solid rgba(59, 130, 246, 0.35)', color: '#1e3a8a' },
+  roleEmpleado: { background: 'rgba(16, 185, 129, 0.14)', border: '1px solid rgba(16, 185, 129, 0.35)', color: '#065f46' },
+  roleUnknown: { background: 'rgba(148, 163, 184, 0.22)', border: '1px solid rgba(148, 163, 184, 0.45)', color: 'rgba(11, 42, 82, 0.86)' },
   totalRow: { marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   totalText: { fontWeight: 900, color: '#0b2a52' },
   primaryBtn: {
