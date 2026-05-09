@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { getDashboard } from '../../api/reportes';
 import { listVentas } from '../../api/ventas';
@@ -46,6 +46,9 @@ export default function AdminReportesPage() {
   const [ventasError, setVentasError] = useState('');
   const [ventas, setVentas] = useState([]);
   const [ventasResumen, setVentasResumen] = useState({ total: 0, cantidad: 0 });
+
+  const [ventasPageSize, setVentasPageSize] = useState(10);
+  const [ventasPage, setVentasPage] = useState(1);
 
   async function refresh() {
     setError('');
@@ -111,6 +114,17 @@ export default function AdminReportesPage() {
     fetchVentasFiltradas({ nextYear: year, nextMonth: month, nextDay: day });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, month, day]);
+
+  const ventasTotalPages = useMemo(() => Math.max(1, Math.ceil(ventas.length / ventasPageSize)), [ventas.length, ventasPageSize]);
+
+  useEffect(() => {
+    setVentasPage((p) => Math.min(Math.max(1, p), ventasTotalPages));
+  }, [ventasTotalPages]);
+
+  const ventasPaged = useMemo(() => {
+    const start = (ventasPage - 1) * ventasPageSize;
+    return ventas.slice(start, start + ventasPageSize);
+  }, [ventas, ventasPage, ventasPageSize]);
 
   const maxDays = month ? daysInMonth(year, month) : 31;
   const daysOptions = Array.from({ length: maxDays }, (_, i) => i + 1);
@@ -265,16 +279,53 @@ export default function AdminReportesPage() {
                   </td>
                 </tr>
               ) : (
-                ventas.map((v) => (
+                ventasPaged.map((v) => (
                   <tr key={v.id} style={styles.tr}>
                     <td style={styles.td}>{String(v.created_at || '').slice(0, 19).replace('T', ' ')}</td>
-                    <td style={styles.td}>{v.usuario_id ?? '-'}</td>
+                    <td style={styles.td}>{v.usuario_nombre || v.usuario_email || (v.usuario_id ?? '-')}</td>
                     <td style={styles.tdRight}>{formatMoney(v.total)}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+
+          {!ventasLoading && ventas.length > 0 ? (
+            <div style={styles.tableFooter}>
+              <div style={styles.footerLeft}>
+                <span style={styles.footerMuted}>
+                  Mostrando {(ventasPage - 1) * ventasPageSize + 1}–{Math.min(ventasPage * ventasPageSize, ventas.length)} de {ventas.length}
+                </span>
+                <select value={ventasPageSize} onChange={(e) => setVentasPageSize(Number(e.target.value) || 10)} style={styles.selectSmall}>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+              <div style={styles.footerRight}>
+                <button type="button" style={styles.smallBtn} onClick={() => setVentasPage(1)} disabled={ventasPage <= 1}>
+                  «
+                </button>
+                <button type="button" style={styles.smallBtn} onClick={() => setVentasPage((p) => Math.max(1, p - 1))} disabled={ventasPage <= 1}>
+                  ‹
+                </button>
+                <span style={styles.footerMuted}>
+                  Página {ventasPage} / {ventasTotalPages}
+                </span>
+                <button
+                  type="button"
+                  style={styles.smallBtn}
+                  onClick={() => setVentasPage((p) => Math.min(ventasTotalPages, p + 1))}
+                  disabled={ventasPage >= ventasTotalPages}
+                >
+                  ›
+                </button>
+                <button type="button" style={styles.smallBtn} onClick={() => setVentasPage(ventasTotalPages)} disabled={ventasPage >= ventasTotalPages}>
+                  »
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
     </div>
@@ -439,5 +490,34 @@ const styles = {
     color: 'rgba(11, 42, 82, 0.92)',
     whiteSpace: 'nowrap',
     textAlign: 'right',
+  },
+  tableFooter: {
+    marginTop: 12,
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  footerLeft: { display: 'flex', alignItems: 'center', gap: 10 },
+  footerRight: { display: 'flex', alignItems: 'center', gap: 6 },
+  footerMuted: { color: 'rgba(11, 42, 82, 0.72)', fontWeight: 800, fontSize: 12 },
+  selectSmall: {
+    padding: '8px 10px',
+    borderRadius: 12,
+    border: '1px solid rgba(11, 42, 82, 0.18)',
+    outline: 'none',
+    background: 'rgba(255,255,255,0.55)',
+    color: '#0b2a52',
+    fontWeight: 800,
+  },
+  smallBtn: {
+    padding: '8px 10px',
+    borderRadius: 12,
+    border: '1px solid rgba(11, 42, 82, 0.22)',
+    background: 'rgba(255,255,255,0.25)',
+    color: '#0b2a52',
+    fontWeight: 900,
+    cursor: 'pointer',
   },
 };
