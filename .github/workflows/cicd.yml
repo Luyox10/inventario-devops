@@ -2,9 +2,16 @@ name: CI-CD
 
 on:
   push:
-    branches: ["main", "master"]
+    branches:
+      - main
+      - master
+      - feature/deployment-simulations
+
   pull_request:
-    branches: ["main", "master"]
+    branches:
+      - main
+      - master
+      - feature/deployment-simulations
 
 env:
   REGISTRY: docker.io
