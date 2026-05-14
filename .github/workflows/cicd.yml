@@ -212,7 +212,7 @@ jobs:
         run: echo "Validando métricas, errores y logs de Canary"
 
       - name: Promote canary to 100 percent
-        run: echo "Promoviendo Canary al 100% del tráfico"
+        run: echo "Promoviendo Canary deployment al 100% del tráfico"
 
       - name: Rollback canary if needed
         if: failure()
