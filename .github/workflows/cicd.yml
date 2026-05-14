@@ -167,3 +167,46 @@ jobs:
         run: |
           echo "El pipeline falló. Revisar logs en GitHub Actions."
           exit 1
+
+  blue-green-deploy:
+    name: Blue-Green deployment simulation
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Deploy green environment
+        run: echo "Desplegando nueva versión en ambiente Green"
+
+      - name: Run health check on green
+        run: echo "Validando ambiente Green antes de enviar tráfico"
+
+      - name: Switch traffic from Blue to Green
+        run: echo "Cambiando tráfico de Blue a Green"
+
+      - name: Rollback to Blue if needed
+        if: failure()
+        run: echo "Error detectado. Regresando tráfico a Blue"
+
+  canary-deploy:
+    name: Canary deployment simulation
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Deploy canary version
+        run: echo "Desplegando nueva versión Canary"
+
+      - name: Send 10 percent traffic to canary
+        run: echo "Enviando 10% del tráfico a Canary"
+
+      - name: Validate canary metrics
+        run: echo "Validando métricas, errores y logs de Canary"
+
+      - name: Promote canary to 100 percent
+        run: echo "Promoviendo Canary al 100% del tráfico"
+
+      - name: Rollback canary if needed
+        if: failure()
+        run: echo "Error detectado. Cancelando Canary y manteniendo versión estable"
