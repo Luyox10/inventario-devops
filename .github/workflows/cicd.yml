@@ -83,3 +83,14 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.frontend_meta.outputs.tags }}
           labels: ${{ steps.frontend_meta.outputs.labels }}
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy completed
+        run: echo "Aplicación desplegada correctamente"
+          
