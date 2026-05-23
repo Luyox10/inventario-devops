@@ -134,11 +134,14 @@ export default function AdminLayout() {
 
 const styles = {
   page: {
-    minHeight: '100vh',
+    minHeight: '100dvh',
+    width: '100%',
+    minWidth: 0,
     display: 'grid',
     gridTemplateColumns: '280px 1fr',
     background: 'linear-gradient(135deg, #f2a1a5 0%, #b087b7 40%, #5377c8 100%)',
     fontFamily: 'system-ui, Arial',
+    overflowX: 'hidden',
   },
   sidebar: {
     padding: 18,
@@ -232,6 +235,8 @@ const styles = {
   },
   main: {
     padding: 20,
+    minWidth: 0,
+    overflowX: 'hidden',
   },
   mobileTopbar: {
     position: 'sticky',
