@@ -14,6 +14,7 @@ function emptyForm() {
 
 export default function AdminUsuariosPage() {
   const { token, logout } = useAuth();
+  const [isMobile, setIsMobile] = useState(false);
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +36,17 @@ export default function AdminUsuariosPage() {
       return nombre.includes(s) || email.includes(s);
     });
   }, [rows, q]);
+
+  useEffect(() => {
+    const updateViewport = () => setIsMobile((window.visualViewport?.width || window.innerWidth) <= 768);
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    window.visualViewport?.addEventListener('resize', updateViewport);
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+      window.visualViewport?.removeEventListener('resize', updateViewport);
+    };
+  }, []);
 
   async function refresh() {
     setError('');
@@ -215,6 +227,25 @@ export default function AdminUsuariosPage() {
             <div style={styles.muted}>Cargando...</div>
           ) : filtered.length === 0 ? (
             <div style={styles.muted}>No hay usuarios.</div>
+          ) : isMobile ? (
+            <div style={styles.mobileList}>
+              {filtered.map((u) => (
+                <div key={u.id} style={{ ...styles.mobileCard, ...(u.activo ? styles.trOk : styles.trDanger) }}>
+                  <div style={styles.mobileCardTitle}>{u.nombre}</div>
+                  <div style={styles.mobileRow}><span style={styles.mobileLabel}>Email</span><span style={styles.mobileValue}>{u.email}</span></div>
+                  <div style={styles.mobileRow}><span style={styles.mobileLabel}>Rol</span><span style={styles.mobileValue}>{u.rol}</span></div>
+                  <div style={styles.mobileRow}><span style={styles.mobileLabel}>Activo</span><span style={styles.mobileValue}>{u.activo ? 'Sí' : 'No'}</span></div>
+                  <div style={styles.mobileActions}>
+                    <button style={styles.smallBtn} onClick={() => startEdit(u)}>
+                      Editar
+                    </button>
+                    <button style={styles.smallDangerBtn} onClick={() => toggleActivo(u)}>
+                      {u.activo ? 'Desactivar' : 'Activar'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <div style={styles.tableWrap}>
               <table style={styles.table}>
@@ -390,6 +421,19 @@ const styles = {
     fontWeight: 900,
     cursor: 'pointer',
   },
+  mobileList: { display: 'grid', gap: 12, marginTop: 12 },
+  mobileCard: {
+    border: '1px solid rgba(11, 42, 82, 0.14)',
+    borderRadius: 16,
+    padding: 14,
+    background: 'rgba(255,255,255,0.24)',
+    boxShadow: '0 12px 28px rgba(0,0,0,0.10)',
+  },
+  mobileCardTitle: { color: '#0b2a52', fontWeight: 900, fontSize: 16, marginBottom: 10 },
+  mobileRow: { display: 'flex', justifyContent: 'space-between', gap: 12, padding: '7px 0', borderTop: '1px solid rgba(11, 42, 82, 0.08)' },
+  mobileLabel: { color: 'rgba(11, 42, 82, 0.68)', fontWeight: 900, fontSize: 12 },
+  mobileValue: { color: '#0b2a52', fontWeight: 800, fontSize: 13, textAlign: 'right', overflowWrap: 'anywhere' },
+  mobileActions: { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', marginTop: 12 },
   trOk: { background: 'rgba(16, 185, 129, 0.08)' },
   trDanger: { background: 'rgba(239, 68, 68, 0.10)' },
 };

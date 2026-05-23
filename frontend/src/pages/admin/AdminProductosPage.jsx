@@ -17,6 +17,7 @@ function emptyForm() {
 
 export default function AdminProductosPage() {
   const { token, logout } = useAuth();
+  const [isMobile, setIsMobile] = useState(false);
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -444,6 +445,29 @@ export default function AdminProductosPage() {
             <div style={styles.muted}>Cargando...</div>
           ) : sortedRows.length === 0 ? (
             <div style={styles.muted}>No hay productos registrados.</div>
+          ) : isMobile ? (
+            <div style={styles.mobileList}>
+              {pagedRows.map((r) => {
+                const actual = Number(r.stock_actual || 0);
+                const minimo = Number(r.stock_minimo || 0);
+                const estadoLabel = actual <= 0 ? 'SIN STOCK' : actual <= minimo ? 'BAJO' : 'OK';
+
+                return (
+                  <div key={r.id} style={{ ...styles.mobileCard, ...(actual <= 0 ? styles.trDanger : actual <= minimo ? styles.trWarn : styles.trOk) }}>
+                    <div style={styles.mobileCardTitle}>{r.nombre}</div>
+                    <div style={styles.mobileRow}><span style={styles.mobileLabel}>SKU</span><span style={styles.mobileValue}>{r.sku || '-'}</span></div>
+                    <div style={styles.mobileRow}><span style={styles.mobileLabel}>Unidad</span><span style={styles.mobileValue}>{r.unidad || 'und'}</span></div>
+                    <div style={styles.mobileRow}><span style={styles.mobileLabel}>Precio</span><span style={styles.mobileValue}>S/ {Number(r.precio).toFixed(2)}</span></div>
+                    <div style={styles.mobileRow}><span style={styles.mobileLabel}>Stock</span><span style={styles.mobileValue}>{actual}</span></div>
+                    <div style={styles.mobileRow}><span style={styles.mobileLabel}>Estado</span><span style={styles.mobileValue}>{estadoLabel}</span></div>
+                    <div style={styles.mobileActions}>
+                      <button style={styles.smallBtn} onClick={() => startEdit(r)} title="Editar">✏️ Editar</button>
+                      <button style={styles.smallDangerBtn} onClick={() => onDelete(r)} title="Eliminar">🗑️ Eliminar</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
             <div style={styles.tableWrap}>
               <table style={styles.table}>
@@ -910,4 +934,17 @@ const styles = {
   },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   modalFooter: { marginTop: 12, display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' },
+  mobileList: { display: 'grid', gap: 12, marginTop: 12 },
+  mobileCard: {
+    border: '1px solid rgba(11, 42, 82, 0.14)',
+    borderRadius: 16,
+    padding: 14,
+    background: 'rgba(255,255,255,0.24)',
+    boxShadow: '0 12px 28px rgba(0,0,0,0.10)',
+  },
+  mobileCardTitle: { color: '#0b2a52', fontWeight: 900, fontSize: 16, marginBottom: 10 },
+  mobileRow: { display: 'flex', justifyContent: 'space-between', gap: 12, padding: '7px 0', borderTop: '1px solid rgba(11, 42, 82, 0.08)' },
+  mobileLabel: { color: 'rgba(11, 42, 82, 0.68)', fontWeight: 900, fontSize: 12 },
+  mobileValue: { color: '#0b2a52', fontWeight: 800, fontSize: 13, textAlign: 'right', overflowWrap: 'anywhere' },
+  mobileActions: { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', marginTop: 12 },
 };
