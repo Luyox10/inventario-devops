@@ -11,6 +11,7 @@ function formatMoney(n) {
 
 export default function AdminVentasPage() {
   const { token, logout } = useAuth();
+  const [isMobile, setIsMobile] = useState(false);
 
   const [productos, setProductos] = useState([]);
   const [loadingProductos, setLoadingProductos] = useState(true);
@@ -38,6 +39,17 @@ export default function AdminVentasPage() {
     const sum = cart.reduce((acc, it) => acc + Number(it.subtotal || 0), 0);
     return Number(sum.toFixed(2));
   }, [cart]);
+
+  useEffect(() => {
+    const updateViewport = () => setIsMobile((window.visualViewport?.width || window.innerWidth) <= 768);
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    window.visualViewport?.addEventListener('resize', updateViewport);
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+      window.visualViewport?.removeEventListener('resize', updateViewport);
+    };
+  }, []);
 
   function toggleHistSort(key) {
     setHistSort((prev) => {
@@ -294,6 +306,22 @@ export default function AdminVentasPage() {
 
           {cart.length === 0 ? (
             <div style={styles.muted}>No hay items en la venta.</div>
+          ) : isMobile ? (
+            <div style={styles.mobileList}>
+              {cart.map((it) => (
+                <div key={it.producto_id} style={styles.mobileCard}>
+                  <div style={styles.mobileCardTitle}>{it.nombre}</div>
+                  <div style={styles.mobileRow}><span style={styles.mobileLabel}>Cantidad</span><span style={styles.mobileValue}>{it.cantidad}</span></div>
+                  <div style={styles.mobileRow}><span style={styles.mobileLabel}>Precio</span><span style={styles.mobileValue}>{formatMoney(it.precio_unitario)}</span></div>
+                  <div style={styles.mobileRow}><span style={styles.mobileLabel}>Subtotal</span><span style={styles.mobileValue}>{formatMoney(it.subtotal)}</span></div>
+                  <div style={styles.mobileActions}>
+                    <button style={styles.smallDangerBtn} onClick={() => removeItem(it.producto_id)}>
+                      Quitar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <div style={styles.tableWrap}>
               <table style={styles.table}>
@@ -359,6 +387,39 @@ export default function AdminVentasPage() {
             <div style={styles.muted}>Cargando...</div>
           ) : historial.length === 0 ? (
             <div style={styles.muted}>No hay ventas.</div>
+          ) : isMobile ? (
+            <div style={styles.mobileList}>
+              {historialPaged.map((v) => (
+                <div key={v.id} style={styles.mobileCard}>
+                  <div style={styles.mobileCardTitle}>Venta #{v.id}</div>
+                  <div style={styles.mobileRow}><span style={styles.mobileLabel}>Usuario</span><span style={styles.mobileValue}>{v.usuario_nombre || v.usuario_email || v.usuario_id}</span></div>
+                  <div style={styles.mobileRow}><span style={styles.mobileLabel}>Rol</span><span style={styles.mobileValue}><span style={{ ...styles.roleBadge, ...rolBadgeStyle(v.usuario_rol) }}>{v.usuario_rol || '—'}</span></span></div>
+                  <div style={styles.mobileRow}><span style={styles.mobileLabel}>Total</span><span style={styles.mobileValue}>{formatMoney(v.total)}</span></div>
+                  <div style={styles.mobileRow}><span style={styles.mobileLabel}>Fecha</span><span style={styles.mobileValue}>{new Date(v.created_at).toLocaleString()}</span></div>
+                </div>
+              ))}
+
+              <div style={styles.tableFooter}>
+                <div style={styles.footerLeft}>
+                  <span style={styles.footerMuted}>
+                    Mostrando {(histPage - 1) * histPageSize + 1}–{Math.min(histPage * histPageSize, historialSorted.length)} de{' '}
+                    {historialSorted.length}
+                  </span>
+                  <select value={histPageSize} onChange={(e) => setHistPageSize(Number(e.target.value) || 10)} style={styles.selectSmall}>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </div>
+                <div style={styles.footerRight}>
+                  <button type="button" style={styles.smallBtn} onClick={() => setHistPage(1)} disabled={histPage <= 1}>«</button>
+                  <button type="button" style={styles.smallBtn} onClick={() => setHistPage((p) => Math.max(1, p - 1))} disabled={histPage <= 1}>‹</button>
+                  <span style={styles.footerMuted}>Página {histPage} / {histTotalPages}</span>
+                  <button type="button" style={styles.smallBtn} onClick={() => setHistPage((p) => Math.min(histTotalPages, p + 1))} disabled={histPage >= histTotalPages}>›</button>
+                  <button type="button" style={styles.smallBtn} onClick={() => setHistPage(histTotalPages)} disabled={histPage >= histTotalPages}>»</button>
+                </div>
+              </div>
+            </div>
           ) : (
             <div style={styles.tableWrap}>
               <table style={styles.table}>
