@@ -36,11 +36,8 @@ export default function AdminReportesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const [year, setYear] = useState(currentYear);
-  const [month, setMonth] = useState(0);
-  const [day, setDay] = useState(0);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const [ventasLoading, setVentasLoading] = useState(false);
   const [ventasError, setVentasError] = useState('');
@@ -64,33 +61,11 @@ export default function AdminReportesPage() {
     }
   }
 
-  async function fetchVentasFiltradas({ nextYear, nextMonth, nextDay }) {
+  async function fetchVentasFiltradas() {
     setVentasError('');
     setVentasLoading(true);
     try {
-      const y = Number(nextYear);
-      const m = Number(nextMonth);
-      const d = Number(nextDay);
-
-      let from;
-      let to;
-
-      if (y && m && d) {
-        from = startOfDayIso(y, m, d);
-        to = endOfDayIso(y, m, d);
-      } else if (y && m) {
-        const last = daysInMonth(y, m);
-        from = startOfDayIso(y, m, 1);
-        to = endOfDayIso(y, m, last);
-      } else if (y) {
-        from = `${y}-01-01 00:00:00`;
-        to = `${y}-12-31 23:59:59`;
-      } else {
-        from = undefined;
-        to = undefined;
-      }
-
-      const res = await listVentas({ token, from, to });
+      const res = await listVentas({ token, from: fromDate || undefined, to: toDate || undefined });
       const rows = Array.isArray(res) ? res : [];
 
       const total = rows.reduce((acc, v) => acc + Number(v?.total || 0), 0);
@@ -106,14 +81,9 @@ export default function AdminReportesPage() {
 
   useEffect(() => {
     refresh();
-    fetchVentasFiltradas({ nextYear: currentYear, nextMonth: 0, nextDay: 0 });
+    fetchVentasFiltradas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    fetchVentasFiltradas({ nextYear: year, nextMonth: month, nextDay: day });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [year, month, day]);
 
   const ventasTotalPages = useMemo(() => Math.max(1, Math.ceil(ventas.length / ventasPageSize)), [ventas.length, ventasPageSize]);
 
@@ -126,9 +96,11 @@ export default function AdminReportesPage() {
     return ventas.slice(start, start + ventasPageSize);
   }, [ventas, ventasPage, ventasPageSize]);
 
-  const maxDays = month ? daysInMonth(year, month) : 31;
-  const daysOptions = Array.from({ length: maxDays }, (_, i) => i + 1);
-  const yearsOptions = Array.from({ length: 6 }, (_, i) => currentYear - i);
+  function limpiarFiltros() {
+    setFromDate('');
+    setToDate('');
+    fetchVentasFiltradas();
+  }
 
   return (
     <div style={styles.page}>
@@ -174,72 +146,45 @@ export default function AdminReportesPage() {
         <div style={styles.sectionHead}>
           <div>
             <div style={styles.sectionTitle}>Ventas</div>
-            <div style={styles.sectionSub}>Filtra por año, mes o día.</div>
+            <div style={styles.sectionSub}>Filtra por rango de fechas.</div>
           </div>
-          <button
-            onClick={() => fetchVentasFiltradas({ nextYear: year, nextMonth: month, nextDay: day })}
-            style={styles.secondaryBtn}
-            disabled={ventasLoading}
-          >
-            {ventasLoading ? 'Cargando...' : 'Aplicar filtro'}
-          </button>
+          <div style={styles.sectionButtons}>
+            <button
+              onClick={limpiarFiltros}
+              style={styles.tertiaryBtn}
+              disabled={ventasLoading}
+            >
+              Limpiar
+            </button>
+            <button
+              onClick={fetchVentasFiltradas}
+              style={styles.secondaryBtn}
+              disabled={ventasLoading}
+            >
+              {ventasLoading ? 'Cargando...' : 'Aplicar filtro'}
+            </button>
+          </div>
         </div>
 
         <div style={styles.filters}>
           <label style={styles.filterItem}>
-            <div style={styles.filterLabel}>Año</div>
-            <select
-              style={styles.select}
-              value={year}
-              onChange={(e) => {
-                const next = Number(e.target.value);
-                setYear(next);
-              }}
-            >
-              {yearsOptions.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
+            <div style={styles.filterLabel}>Desde</div>
+            <input
+              type="date"
+              style={styles.dateInput}
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+            />
           </label>
 
           <label style={styles.filterItem}>
-            <div style={styles.filterLabel}>Mes</div>
-            <select
-              style={styles.select}
-              value={month}
-              onChange={(e) => {
-                const next = Number(e.target.value);
-                setMonth(next);
-                setDay(0);
-              }}
-            >
-              <option value={0}>Todos</option>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <option key={m} value={m}>
-                  {pad2(m)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label style={styles.filterItem}>
-            <div style={styles.filterLabel}>Día</div>
-            <select
-              style={styles.select}
-              value={day}
-              onChange={(e) => setDay(Number(e.target.value))}
-              disabled={!month}
-              title={!month ? 'Selecciona un mes para habilitar el día' : ''}
-            >
-              <option value={0}>Todos</option>
-              {daysOptions.map((d) => (
-                <option key={d} value={d}>
-                  {pad2(d)}
-                </option>
-              ))}
-            </select>
+            <div style={styles.filterLabel}>Hasta</div>
+            <input
+              type="date"
+              style={styles.dateInput}
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+            />
           </label>
         </div>
 
@@ -281,7 +226,7 @@ export default function AdminReportesPage() {
               ) : (
                 ventasPaged.map((v) => (
                   <tr key={v.id} style={styles.tr}>
-                    <td style={styles.td}>{String(v.created_at || '').slice(0, 19).replace('T', ' ')}</td>
+                    <td style={styles.td}>{new Date(v.created_at).toLocaleString()}</td>
                     <td style={styles.td}>{v.usuario_nombre || v.usuario_email || (v.usuario_id ?? '-')}</td>
                     <td style={styles.tdRight}>{formatMoney(v.total)}</td>
                   </tr>
@@ -405,6 +350,15 @@ const styles = {
     fontWeight: 900,
     cursor: 'pointer',
   },
+  tertiaryBtn: {
+    padding: '10px 12px',
+    borderRadius: 14,
+    border: '1px solid rgba(11, 42, 82, 0.22)',
+    background: 'rgba(255,255,255,0.55)',
+    color: '#0b2a52',
+    fontWeight: 900,
+    cursor: 'pointer',
+  },
   sectionHead: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -412,16 +366,30 @@ const styles = {
     alignItems: 'flex-start',
     marginBottom: 12,
   },
+  sectionButtons: {
+    display: 'flex',
+    gap: 8,
+  },
   sectionTitle: { fontSize: 16, fontWeight: 900, color: '#0b2a52' },
   sectionSub: { marginTop: 6, fontSize: 13, fontWeight: 800, color: 'rgba(11, 42, 82, 0.72)' },
   filters: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gridTemplateColumns: 'repeat(2, 1fr)',
     gap: 12,
     marginBottom: 12,
   },
   filterItem: { display: 'block' },
   filterLabel: { fontSize: 12, fontWeight: 900, color: 'rgba(11, 42, 82, 0.70)', marginBottom: 6 },
+  dateInput: {
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: 14,
+    border: '1px solid rgba(11, 42, 82, 0.14)',
+    background: 'rgba(255,255,255,0.70)',
+    color: '#0b2a52',
+    fontWeight: 900,
+    outline: 'none',
+  },
   select: {
     width: '100%',
     padding: '10px 12px',

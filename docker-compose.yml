@@ -8,6 +8,7 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: rootpass
       MYSQL_DATABASE: inventario
+      TZ: America/Lima
     volumes:
       - mysql_data:/var/lib/mysql
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
@@ -36,6 +37,7 @@ services:
       DB_USER: root
       DB_PASSWORD: rootpass
       DB_NAME: inventario
+      DB_TIMEZONE: America/Lima
       JWT_SECRET: change_this_secret
       JWT_EXPIRES_IN: 1d
       BOOTSTRAP_SECRET: change_this_bootstrap_secret
