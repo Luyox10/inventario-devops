@@ -57,6 +57,15 @@ function getDbConfig() {
 
 const pool = mysql.createPool(getDbConfig());
 
+pool.on('connection', (connection) => {
+  connection
+    .promise()
+    .query('SET time_zone = "-05:00"')
+    .catch((err) => {
+      console.error('Error setting timezone:', err);
+    });
+});
+
 const tidbReplicaRead = process.env.TIDB_REPLICA_READ;
 if (tidbReplicaRead && ['leader', 'follower', 'closest-adaptive', 'closest-replicas'].includes(tidbReplicaRead)) {
   pool.on('connection', (connection) => {
