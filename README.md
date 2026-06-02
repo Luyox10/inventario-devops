@@ -1,6 +1,6 @@
 # inventario-devops
 
-Sistema de gestion de inventarios con backend en Node.js/Express, frontend en React (Vite) y base de datos MySQL.
+Sistema de gestion de inventarios con backend en Node.js/Express, frontend en React (Vite) y base de datos TiDB.
 
 ## Levantar todo con Docker (backend + frontend + db)
 
