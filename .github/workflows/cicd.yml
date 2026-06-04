@@ -179,23 +179,24 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
-      - name: Terraform Format Check
-        run: terraform fmt -check
+      - name: Terraform Format
+        run: terraform fmt -recursive
         working-directory: ./terraform
         continue-on-error: true
 
       - name: Terraform Init
-        run: terraform init -backend=false
+        run: terraform init
         working-directory: ./terraform
 
       - name: Terraform Validate
         run: terraform validate
         working-directory: ./terraform
 
-      - name: Terraform Plan (Simulation)
+      - name: Terraform Plan
         run: terraform plan
         working-directory: ./terraform
         continue-on-error: true
+
 
   deploy:
     name: Deploy simulation (Render)
@@ -210,8 +211,9 @@ jobs:
       - name: Deploy completed
         run: |
           echo "Terraform validado correctamente"
-          echo "Imágenes publicadas en DockerHub"
-          echo "Render realiza el despliegue automático del frontend y backend"
+          echo "Build y push de imágenes completado"
+          echo "Render realiza el despliegue automático desde GitHub"
+
 
   monitor-pipeline:
     name: Monitor pipeline status
@@ -249,4 +251,4 @@ jobs:
             needs.deploy.result == 'failure'
         run: |
           echo "El pipeline falló. Revisar logs en GitHub Actions."
-          exit 1
+          exit 1 
