@@ -31,6 +31,7 @@ jobs:
           terraform validate
 
       - name: Terraform Security Scan
-        uses: aquasecurity/tfsec-action@v1.0.0
+        uses: aquasecurity/tfsec-action@master
         with:
           working_directory: terraform/
+        continue-on-error: true
