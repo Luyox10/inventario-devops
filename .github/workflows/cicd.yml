@@ -17,38 +17,38 @@ jobs:
   quality-gates:
     name: Quality gates
     runs-on: ubuntu-latest
- 
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
- 
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: "npm"
- 
+
       - name: Install root dependencies
         run: npm ci
- 
+
       - name: Install backend dependencies
         run: npm ci --prefix backend
- 
+
       - name: Install frontend dependencies
         run: npm ci --prefix frontend
- 
+
       - name: Run backend tests
         run: npm run test --prefix backend
- 
+
       - name: Run frontend tests
         run: npm run test --prefix frontend
- 
+
       - name: Build frontend
         run: npm run build --prefix frontend
- 
+
       - name: Audit backend dependencies
         run: npm audit --prefix backend --audit-level=high
- 
+
       - name: Audit frontend dependencies
         run: npm audit --prefix frontend --audit-level=high
 
@@ -96,7 +96,6 @@ jobs:
     name: Build and push Docker images
     runs-on: ubuntu-latest
     needs: quality-gates
-
 
     steps:
       - name: Checkout
@@ -166,9 +165,41 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.frontend_meta.outputs.tags }}
           labels: ${{ steps.frontend_meta.outputs.labels }}
-  deploy:
-    name: Deploy simulation
+
+  terraform-validation:
+    name: Terraform Validation and Plan
+    runs-on: ubuntu-latest
     needs: build-and-push
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Format Check
+        run: terraform fmt -check
+        working-directory: ./terraform
+        continue-on-error: true
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+        working-directory: ./terraform
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: ./terraform
+
+      - name: Terraform Plan (Simulation)
+        run: terraform plan
+        working-directory: ./terraform
+        continue-on-error: true
+
+  deploy:
+    name: Deploy simulation (Render)
+    needs: terraform-validation
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
 
@@ -177,17 +208,21 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy completed
-        run: echo "Aplicación desplegada correctamente"
-          
+        run: |
+          echo "Terraform validado correctamente"
+          echo "Imágenes publicadas en DockerHub"
+          echo "Render realiza el despliegue automático del frontend y backend"
+
   monitor-pipeline:
     name: Monitor pipeline status
     runs-on: ubuntu-latest
     needs:
       - quality-gates
       - build-and-push
+      - terraform-validation
       - deploy
     if: always()
- 
+
     steps:
       - name: Show pipeline information
         run: |
@@ -197,14 +232,21 @@ jobs:
           echo "Ejecutado por: ${{ github.actor }}"
           echo "Resultado quality-gates: ${{ needs.quality-gates.result }}"
           echo "Resultado build-and-push: ${{ needs.build-and-push.result }}"
+          echo "Resultado terraform-validation: ${{ needs.terraform-validation.result }}"
           echo "Resultado deploy: ${{ needs.deploy.result }}"
- 
+
       - name: Notify successful pipeline
-        if: needs.quality-gates.result == 'success' && needs.build-and-push.result == 'success' && needs.deploy.result == 'success'
+        if: needs.quality-gates.result == 'success' &&
+            needs.build-and-push.result == 'success' &&
+            needs.terraform-validation.result == 'success' &&
+            needs.deploy.result == 'success'
         run: echo "Pipeline CI/CD finalizado correctamente."
- 
+
       - name: Notify failed pipeline
-        if: needs.quality-gates.result == 'failure' || needs.build-and-push.result == 'failure' || needs.deploy.result == 'failure'
+        if: needs.quality-gates.result == 'failure' ||
+            needs.build-and-push.result == 'failure' ||
+            needs.terraform-validation.result == 'failure' ||
+            needs.deploy.result == 'failure'
         run: |
           echo "El pipeline falló. Revisar logs en GitHub Actions."
           exit 1
