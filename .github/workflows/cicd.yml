@@ -52,6 +52,39 @@ jobs:
       - name: Audit frontend dependencies
         run: npm audit --prefix frontend --audit-level=high
 
+      - name: Lint Dockerfiles
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: backend/Dockerfile
+
+      - name: Lint frontend Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: frontend/Dockerfile
+
+      - name: Lint YAML files
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: .github/workflows/ devops/kubernetes/
+          config_file: .yamllint
+
+      - name: Security scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Validate Kubernetes manifests
+        run: |
+          kubectl apply --dry-run=client -f devops/kubernetes/
+
   build-and-push:
     name: Build and push Docker images
     runs-on: ubuntu-latest
