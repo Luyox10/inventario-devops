@@ -6,7 +6,7 @@ import { useAuth } from '../../state/auth/AuthContext.jsx';
 
 const ReposicionPage = () => {
   const { token, logout } = useAuth();
-  const [form, setForm] = useState({ cantidad: '' });
+  const [form, setForm] = useState({ cantidad: '', expiry_date: '' });
   const [status, setStatus] = useState({ type: '', msg: '' });
   const [productos, setProductos] = useState([]);
   const [loadingProductos, setLoadingProductos] = useState(true);
@@ -87,13 +87,13 @@ const ReposicionPage = () => {
       if (!productoId || Number.isNaN(productoId) || productoId <= 0) throw new Error('Producto inválido');
       if (!cantidad || Number.isNaN(cantidad) || cantidad <= 0) throw new Error('Cantidad inválida');
 
-      await updateStockMovimiento({ token, productoId, tipo: 'ENTRADA', cantidad, motivo: 'Reposición' });
+      await updateStockMovimiento({ token, productoId, tipo: 'ENTRADA', cantidad, motivo: 'Reposición', expiry_date });
       setStatus({ type: 'success', msg: '✅ Stock actualizado correctamente en el sistema.' });
 
       setProductoId('');
       setProductoQuery('');
       setProductoOpen(false);
-      setForm({ cantidad: '' });
+      setForm({ cantidad: '', expiry_date: '' });
     } catch (error) {
       setStatus({ type: 'error', msg: '❌ Error: ' + error.message });
     }
@@ -186,6 +186,16 @@ const ReposicionPage = () => {
             value={form.cantidad} 
             onChange={e => setForm({...form, cantidad: e.target.value})} 
             required
+          />
+        </div>
+
+        <div style={styles.inputGroup}>
+          <label style={styles.label}>FECHA DE VENCIMIENTO (OPCIONAL)</label>
+          <input 
+            type="date" 
+            style={styles.input}
+            value={form.expiry_date} 
+            onChange={e => setForm({...form, expiry_date: e.target.value})} 
           />
         </div>
 

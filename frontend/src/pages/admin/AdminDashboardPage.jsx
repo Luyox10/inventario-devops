@@ -211,6 +211,7 @@ export default function AdminDashboardPage() {
   const [ventas7dLabels, setVentas7dLabels] = useState([]);
   const [productosStats, setProductosStats] = useState({ ok: 0, bajo: 0, sinStock: 0, total: 0 });
   const [alertas, setAlertas] = useState([]);
+  const [expiryStats, setExpiryStats] = useState({ proximos: 0, vencidos: 0 });
 
   async function refresh() {
     setError('');
@@ -262,6 +263,11 @@ export default function AdminDashboardPage() {
       setProductosStats({ ok, bajo, sinStock, total: productos.length });
 
       setAlertas(Array.isArray(resAlertas) ? resAlertas : []);
+
+      setExpiryStats({
+        proximos: Number(resDashboard?.proximos_a_vencer || 0),
+        vencidos: Number(resDashboard?.vencidos || 0),
+      });
     } catch (err) {
       if (err.status === 401) logout();
       setError(err.message || 'Error');
@@ -391,6 +397,24 @@ export default function AdminDashboardPage() {
           </div>
           {loading ? null : <div style={styles.cta}>Ver alertas</div>}
         </Link>
+
+        <div style={styles.kpiCardExpiry}>
+          <div style={styles.kpiLabel}>Próximos a vencer</div>
+          <div style={styles.kpiValue}>{loading ? '...' : expiryStats.proximos}</div>
+          <div style={styles.kpiChartBelow}>
+            {loading ? null : (
+              <DonutSegments
+                segments={[
+                  { key: 'pront', value: expiryStats.proximos, color: 'rgba(245, 158, 11, 0.92)' },
+                  { key: 'vencidos', value: expiryStats.vencidos, color: 'rgba(239, 68, 68, 0.92)' },
+                ]}
+              />
+            )}
+          </div>
+          <div style={styles.kpiHint}>
+            {loading ? '...' : expiryStats.vencidos > 0 ? `⚠️ ${expiryStats.vencidos} vencidos` : 'Sin expirados'}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -443,6 +467,15 @@ const styles = {
     textDecoration: 'none',
     background: 'rgba(245, 158, 11, 0.10)',
     border: '1px solid rgba(245, 158, 11, 0.25)',
+    borderRadius: 18,
+    padding: 16,
+    boxShadow: '0 28px 60px rgba(0, 0, 0, 0.16)',
+    backdropFilter: 'blur(14px)',
+  },
+  kpiCardExpiry: {
+    textDecoration: 'none',
+    background: 'rgba(239, 68, 68, 0.08)',
+    border: '1px solid rgba(239, 68, 68, 0.20)',
     borderRadius: 18,
     padding: 16,
     boxShadow: '0 28px 60px rgba(0, 0, 0, 0.16)',

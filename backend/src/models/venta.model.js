@@ -54,6 +54,43 @@ async function createMovimiento(connection, { producto_id, usuario_id, venta_id,
   );
 }
 
+async function allocateLotesForSale(connection, producto_id, cantidad) {
+  const qty = Math.max(0, Number(cantidad || 0));
+  if (!connection || qty <= 0) return [];
+
+  const [lots] = await connection.query(
+    `SELECT id, cantidad, expiry_date
+     FROM lotes
+     WHERE producto_id = ? AND activo = 1
+     ORDER BY expiry_date IS NULL, expiry_date ASC, id ASC
+     FOR UPDATE`,
+    [producto_id]
+  );
+
+  let remaining = qty;
+  const consumed = [];
+
+  for (const lot of lots) {
+    if (remaining <= 0) break;
+    const available = Number(lot.cantidad || 0);
+    if (available <= 0) continue;
+
+    const taken = Math.min(available, remaining);
+    const nextQty = available - taken;
+
+    if (nextQty <= 0) {
+      await connection.query('UPDATE lotes SET cantidad = 0, activo = 0 WHERE id = ?', [lot.id]);
+    } else {
+      await connection.query('UPDATE lotes SET cantidad = ? WHERE id = ?', [nextQty, lot.id]);
+    }
+
+    consumed.push({ lote_id: lot.id, cantidad: taken, expiry_date: lot.expiry_date });
+    remaining -= taken;
+  }
+
+  return consumed;
+}
+
 async function listVentas({ from, to } = {}) {
   const norm = normalizeFromTo({ from, to });
   const params = [];
@@ -94,5 +131,6 @@ module.exports = {
   getProductoForUpdate,
   updateProductoStock,
   createMovimiento,
+  allocateLotesForSale,
   listVentas,
 };
