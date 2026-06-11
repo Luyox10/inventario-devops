@@ -81,8 +81,8 @@ async function createProducto(data) {
   let result;
   try {
     [result] = await pool.query(
-      `INSERT INTO productos (nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO productos (nombre, sku, unidad, descripcion, expiry_date, precio, stock_actual, stock_minimo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         payload.nombre,
         payload.sku,
