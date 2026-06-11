@@ -9,6 +9,7 @@ function emptyForm() {
     sku: '',
     unidad: 'und',
     descripcion: '',
+    expiry_date: '',
     precio: '',
     stock_actual: '',
     stock_minimo: '',
@@ -178,6 +179,7 @@ export default function AdminProductosPage() {
       sku: row.sku ?? '',
       unidad: row.unidad ?? 'und',
       descripcion: row.descripcion ?? '',
+      expiry_date: row.expiry_date ?? '',
       precio: String(row.precio ?? ''),
       stock_actual: String(row.stock_actual ?? ''),
       stock_minimo: String(row.stock_minimo ?? ''),
@@ -197,6 +199,7 @@ export default function AdminProductosPage() {
         sku: form.sku.trim(),
         unidad: form.unidad,
         descripcion: form.descripcion.trim() || null,
+        expiry_date: form.expiry_date || null,
         precio: Number(form.precio),
       };
 
@@ -239,6 +242,7 @@ export default function AdminProductosPage() {
         sku: editForm.sku.trim(),
         unidad: editForm.unidad,
         descripcion: editForm.descripcion.trim() || null,
+        expiry_date: editForm.expiry_date || null,
         precio: Number(editForm.precio),
         stock_minimo: Number(editForm.stock_minimo || 0),
       };
@@ -329,6 +333,16 @@ export default function AdminProductosPage() {
                 value={form.descripcion}
                 onChange={(e) => onChange('descripcion', e.target.value)}
                 style={styles.input}
+              />
+            </label>
+
+            <label style={styles.label}>
+              Fecha de vencimiento
+              <input
+                value={form.expiry_date}
+                onChange={(e) => onChange('expiry_date', e.target.value)}
+                style={styles.input}
+                type="date"
               />
             </label>
 
@@ -639,6 +653,11 @@ export default function AdminProductosPage() {
               <label style={styles.label}>
                 Descripción
                 <input value={editForm.descripcion} onChange={(e) => onEditChange('descripcion', e.target.value)} style={styles.input} />
+              </label>
+
+              <label style={styles.label}>
+                Fecha de vencimiento
+                <input value={editForm.expiry_date} onChange={(e) => onEditChange('expiry_date', e.target.value)} style={styles.input} type="date" />
               </label>
 
               <div style={styles.row3}>

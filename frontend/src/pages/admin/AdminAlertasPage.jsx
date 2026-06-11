@@ -105,9 +105,10 @@ export default function AdminAlertasPage() {
                   <th style={styles.th}>Producto</th>
                   <th style={styles.th}>SKU</th>
                   <th style={styles.th}>Unidad</th>
-                  <th style={styles.th}>Stock</th>
-                  <th style={styles.th}>Mínimo</th>
-                  <th style={styles.th}>Estado</th>
+                    <th style={styles.th}>Stock</th>
+                    <th style={styles.th}>Mínimo</th>
+                    <th style={styles.th}>Estado</th>
+                    <th style={styles.th}>Vencimiento</th>
                 </tr>
               </thead>
               <tbody>
@@ -123,6 +124,19 @@ export default function AdminAlertasPage() {
                       <td style={styles.td}>
                         <span style={{ ...styles.badgeBase, ...st.style }}>{st.text}</span>
                       </td>
+                        <td style={styles.td}>
+                          {r.expiry_date ? (
+                            r.expiry_status === 'vencido' ? (
+                              <span style={{ ...styles.badgeBase, ...styles.badgeDanger }}>VENCIDO</span>
+                            ) : r.expiry_status === 'por_vencer' ? (
+                              <span style={{ ...styles.badgeBase, ...styles.badgeWarn }}>{String(r.days_to_expire)} días</span>
+                            ) : (
+                              <span style={{ color: 'rgba(11,42,82,0.7)' }}>{r.expiry_date}</span>
+                            )
+                          ) : (
+                            '-'
+                          )}
+                        </td>
                     </tr>
                   );
                 })}

@@ -13,11 +13,11 @@ ON DUPLICATE KEY UPDATE
   rol = VALUES(rol),
   activo = VALUES(activo);
 
-INSERT INTO productos (nombre, sku, descripcion, precio, stock_actual, stock_minimo, activo)
+INSERT INTO productos (nombre, sku, descripcion, expiry_date, precio, stock_actual, stock_minimo, activo)
 VALUES
-('Producto A', 'SKU-A', 'Producto de ejemplo A', 10.00, 20, 5, 1),
-('Producto B', 'SKU-B', 'Producto de ejemplo B', 25.50, 8, 3, 1),
-('Producto C', 'SKU-C', 'Producto de ejemplo C', 5.75, 2, 5, 1)
+('Producto A', 'SKU-A', 'Producto de ejemplo A', DATE_ADD(CURRENT_DATE(), INTERVAL 30 DAY), 10.00, 20, 5, 1),
+('Producto B', 'SKU-B', 'Producto de ejemplo B', DATE_ADD(CURRENT_DATE(), INTERVAL 5 DAY), 25.50, 8, 3, 1),
+('Producto C', 'SKU-C', 'Producto de ejemplo C', DATE_SUB(CURRENT_DATE(), INTERVAL 2 DAY), 5.75, 2, 5, 1)
 ON DUPLICATE KEY UPDATE
   nombre = VALUES(nombre),
   descripcion = VALUES(descripcion),
