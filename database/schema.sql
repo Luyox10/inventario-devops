@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS productos (
   sku VARCHAR(80) NULL,
   unidad VARCHAR(20) NOT NULL DEFAULT 'und',
   descripcion VARCHAR(255) NULL,
+  expiry_date DATE NULL,
   precio DECIMAL(10,2) NOT NULL,
   stock_actual INT NOT NULL DEFAULT 0,
   stock_minimo INT NOT NULL DEFAULT 0,

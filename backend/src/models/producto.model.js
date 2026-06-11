@@ -36,6 +36,12 @@ function normalizeCreateProductoInput(data) {
     sku: toNullableTrimmedString(data?.sku),
     unidad: toRequiredTrimmedString(data?.unidad, 'und'),
     descripcion: toNullableTrimmedString(data?.descripcion),
+    expiry_date: (function parseDate(d) {
+      if (d == null || d === '') return null;
+      const dt = new Date(d);
+      if (!Number.isFinite(dt.getTime())) return null;
+      return dt.toISOString().slice(0, 10);
+    })(data?.expiry_date),
     precio,
     stock_actual: toSafeInt(data?.stock_actual, 0),
     stock_minimo: toSafeInt(data?.stock_minimo, 0),
@@ -46,6 +52,7 @@ async function listProductos({ includeInactive = false } = {}) {
   const where = includeInactive ? '' : 'WHERE activo = 1';
   const [rows] = await pool.query(
     `SELECT id, nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo, activo, created_at, updated_at
+     , expiry_date
      FROM productos
      ${where}
      ORDER BY id DESC`
@@ -56,6 +63,7 @@ async function listProductos({ includeInactive = false } = {}) {
 async function getProductoById(id) {
   const [rows] = await pool.query(
     `SELECT id, nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo, activo, created_at, updated_at
+     , expiry_date
      FROM productos
      WHERE id = ?
      LIMIT 1`,
@@ -80,6 +88,7 @@ async function createProducto(data) {
         payload.sku,
         payload.unidad,
         payload.descripcion,
+        payload.expiry_date,
         payload.precio,
         payload.stock_actual,
         payload.stock_minimo
@@ -121,13 +130,14 @@ async function updateProducto(id, { nombre, sku, unidad, descripcion, precio, st
 
   await pool.query(
     `UPDATE productos
-     SET nombre = ?, sku = ?, unidad = ?, descripcion = ?, precio = ?, stock_actual = ?, stock_minimo = ?, activo = ?
+     SET nombre = ?, sku = ?, unidad = ?, descripcion = ?, expiry_date = ?, precio = ?, stock_actual = ?, stock_minimo = ?, activo = ?
      WHERE id = ?`,
     [
       next.nombre,
       next.sku,
       next.unidad,
       next.descripcion,
+      next.expiry_date || null,
       next.precio,
       Number(next.stock_actual),
       Number(next.stock_minimo),
