@@ -26,6 +26,13 @@ function toSafeDecimal(value, fallback = 0) {
   return Number(num.toFixed(2));
 }
 
+function parseDateOnly(value) {
+  if (value == null || value === '') return null;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
 function normalizeCreateProductoInput(data) {
   const nombre = toRequiredTrimmedString(data?.nombre);
   const precio = toSafeDecimal(data?.precio, NaN);
@@ -36,12 +43,7 @@ function normalizeCreateProductoInput(data) {
     sku: toNullableTrimmedString(data?.sku),
     unidad: toRequiredTrimmedString(data?.unidad, 'und'),
     descripcion: toNullableTrimmedString(data?.descripcion),
-    expiry_date: (function parseDate(d) {
-      if (d == null || d === '') return null;
-      const dt = new Date(d);
-      if (!Number.isFinite(dt.getTime())) return null;
-      return dt.toISOString().slice(0, 10);
-    })(data?.expiry_date),
+    expiry_date: parseDateOnly(data?.expiry_date),
     precio,
     stock_actual: toSafeInt(data?.stock_actual, 0),
     stock_minimo: toSafeInt(data?.stock_minimo, 0),
@@ -49,27 +51,63 @@ function normalizeCreateProductoInput(data) {
 }
 
 async function listProductos({ includeInactive = false } = {}) {
-  const where = includeInactive ? '' : 'WHERE activo = 1';
+  const where = includeInactive ? '' : 'WHERE p.activo = 1';
   const [rows] = await pool.query(
-    `SELECT id, nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo, activo, created_at, updated_at
-     , expiry_date
-     FROM productos
+    `SELECT p.id,
+            p.nombre,
+            p.sku,
+            p.unidad,
+            p.descripcion,
+            p.precio,
+            p.stock_actual,
+            p.stock_minimo,
+            p.activo,
+            p.created_at,
+            p.updated_at,
+            COALESCE(MIN(l.expiry_date), p.expiry_date) AS expiry_date,
+            DATEDIFF(COALESCE(MIN(l.expiry_date), p.expiry_date), CURRENT_DATE()) AS days_to_expire
+     FROM productos p
+     LEFT JOIN lotes l ON l.producto_id = p.id AND l.activo = 1 AND l.expiry_date IS NOT NULL
      ${where}
-     ORDER BY id DESC`
+     GROUP BY p.id
+     ORDER BY p.id DESC`
   );
   return rows;
 }
 
 async function getProductoById(id) {
   const [rows] = await pool.query(
-    `SELECT id, nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo, activo, created_at, updated_at
-     , expiry_date
-     FROM productos
-     WHERE id = ?
+    `SELECT p.id,
+            p.nombre,
+            p.sku,
+            p.unidad,
+            p.descripcion,
+            p.precio,
+            p.stock_actual,
+            p.stock_minimo,
+            p.activo,
+            p.created_at,
+            p.updated_at,
+            COALESCE(MIN(l.expiry_date), p.expiry_date) AS expiry_date,
+            DATEDIFF(COALESCE(MIN(l.expiry_date), p.expiry_date), CURRENT_DATE()) AS days_to_expire
+     FROM productos p
+     LEFT JOIN lotes l ON l.producto_id = p.id AND l.activo = 1 AND l.expiry_date IS NOT NULL
+     WHERE p.id = ?
+     GROUP BY p.id
      LIMIT 1`,
     [id]
   );
   return rows[0] || null;
+}
+
+async function createLote(productoId, cantidad, expiry_date) {
+  const qty = Math.max(0, Number(cantidad || 0));
+  if (qty <= 0) return null;
+  const [result] = await pool.query(
+    'INSERT INTO lotes (producto_id, cantidad, expiry_date) VALUES (?, ?, ?)',
+    [productoId, qty, expiry_date || null]
+  );
+  return { id: result.insertId, producto_id: productoId, cantidad: qty, expiry_date: expiry_date || null };
 }
 
 async function createProducto(data) {
@@ -91,9 +129,13 @@ async function createProducto(data) {
         payload.expiry_date,
         payload.precio,
         payload.stock_actual,
-        payload.stock_minimo
+        payload.stock_minimo,
       ]
     );
+
+    if (payload.stock_actual > 0) {
+      await createLote(result.insertId, payload.stock_actual, payload.expiry_date);
+    }
   } catch (err) {
     console.error('[producto.model:createProducto] insert failed', {
       payload,
@@ -109,11 +151,11 @@ async function createProducto(data) {
 
   return {
     id: result.insertId,
-    ...payload
+    ...payload,
   };
 }
 
-async function updateProducto(id, { nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo, activo }) {
+async function updateProducto(id, { nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo, activo, expiry_date }) {
   const existing = await getProductoById(id);
   if (!existing) return null;
 
@@ -126,6 +168,7 @@ async function updateProducto(id, { nombre, sku, unidad, descripcion, precio, st
     stock_actual: stock_actual ?? existing.stock_actual,
     stock_minimo: stock_minimo ?? existing.stock_minimo,
     activo: activo ?? existing.activo,
+    expiry_date: expiry_date == null ? existing.expiry_date : parseDateOnly(expiry_date),
   };
 
   await pool.query(
@@ -210,6 +253,43 @@ async function updateStockMinimo(id, stock_minimo) {
   return getProductoById(id);
 }
 
+async function allocateLotesForSalida(connection, producto_id, cantidad) {
+  const qty = Math.max(0, Number(cantidad || 0));
+  if (!connection || qty <= 0) return [];
+
+  const [lots] = await connection.query(
+    `SELECT id, cantidad, expiry_date
+     FROM lotes
+     WHERE producto_id = ? AND activo = 1
+     ORDER BY expiry_date IS NULL, expiry_date ASC, id ASC
+     FOR UPDATE`,
+    [producto_id]
+  );
+
+  let remaining = qty;
+  const allocations = [];
+
+  for (const lot of lots) {
+    if (remaining <= 0) break;
+    const available = Number(lot.cantidad || 0);
+    if (available <= 0) continue;
+
+    const taken = Math.min(available, remaining);
+    const nextQty = available - taken;
+
+    if (nextQty <= 0) {
+      await connection.query('UPDATE lotes SET cantidad = 0, activo = 0 WHERE id = ?', [lot.id]);
+    } else {
+      await connection.query('UPDATE lotes SET cantidad = ? WHERE id = ?', [nextQty, lot.id]);
+    }
+
+    allocations.push({ lote_id: lot.id, cantidad: taken });
+    remaining -= taken;
+  }
+
+  return allocations;
+}
+
 module.exports = {
   listProductos,
   getProductoById,
@@ -218,4 +298,6 @@ module.exports = {
   deleteProductoSoft,
   updateStockCantidad,
   updateStockMinimo,
+  createLote,
+  allocateLotesForSalida,
 };

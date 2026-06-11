@@ -31,6 +31,21 @@ CREATE TABLE IF NOT EXISTS productos (
   UNIQUE KEY uq_productos_sku (sku)
 ) ENGINE=InnoDB;
 
+-- Tabla: lotes
+CREATE TABLE IF NOT EXISTS lotes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  producto_id INT NOT NULL,
+  cantidad INT NOT NULL DEFAULT 0,
+  expiry_date DATE NULL,
+  activo TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_lotes_producto FOREIGN KEY (producto_id) REFERENCES productos(id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE,
+  INDEX idx_lotes_producto (producto_id),
+  INDEX idx_lotes_expiry (expiry_date)
+) ENGINE=InnoDB;
+
 -- Tabla: ventas
 CREATE TABLE IF NOT EXISTS ventas (
   id INT AUTO_INCREMENT PRIMARY KEY,

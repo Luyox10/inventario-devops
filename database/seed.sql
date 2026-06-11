@@ -25,3 +25,14 @@ ON DUPLICATE KEY UPDATE
   stock_actual = VALUES(stock_actual),
   stock_minimo = VALUES(stock_minimo),
   activo = VALUES(activo);
+
+DELETE FROM lotes WHERE producto_id IN (
+  SELECT id FROM productos WHERE sku IN ('SKU-A','SKU-B','SKU-C')
+);
+
+INSERT INTO lotes (producto_id, cantidad, expiry_date)
+SELECT id, 20, DATE_ADD(CURRENT_DATE(), INTERVAL 30 DAY) FROM productos WHERE sku = 'SKU-A'
+UNION ALL
+SELECT id, 8, DATE_ADD(CURRENT_DATE(), INTERVAL 5 DAY) FROM productos WHERE sku = 'SKU-B'
+UNION ALL
+SELECT id, 2, DATE_SUB(CURRENT_DATE(), INTERVAL 2 DAY) FROM productos WHERE sku = 'SKU-C';

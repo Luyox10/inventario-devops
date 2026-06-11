@@ -2,7 +2,7 @@ const productoModel = require('../models/producto.model');
 const { pool } = require('../config/db');
 const { httpError } = require('../utils/httpError');
 
-async function updateCantidad({ productoId, stock_actual, tipo, cantidad, motivo, userId }) {
+async function updateCantidad({ productoId, stock_actual, tipo, cantidad, motivo, expiry_date, userId }) {
   const existing = await productoModel.getProductoById(productoId);
   if (!existing) throw httpError(404, 'Producto no encontrado');
 
@@ -49,6 +49,12 @@ async function updateCantidad({ productoId, stock_actual, tipo, cantidad, motivo
   if (nextStock < 0) throw httpError(400, 'Stock insuficiente');
 
   const next = await productoModel.updateStockCantidad(productoId, nextStock);
+
+  if (movimientoTipo === 'ENTRADA') {
+    await productoModel.createLote(productoId, qty, expiry_date || null);
+  } else {
+    await productoModel.allocateLotesForSalida(pool, productoId, qty);
+  }
 
   await pool.query(
     `INSERT INTO movimientos (producto_id, usuario_id, venta_id, tipo, cantidad, motivo)

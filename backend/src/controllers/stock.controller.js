@@ -3,13 +3,14 @@ const stockService = require('../services/stock.service');
 async function updateCantidad(req, res, next) {
   try {
     const productoId = Number(req.params.productoId);
-    const { stock_actual, tipo, cantidad, motivo } = req.body || {};
+    const { stock_actual, tipo, cantidad, motivo, expiry_date } = req.body || {};
     const result = await stockService.updateCantidad({
       productoId,
       stock_actual,
       tipo,
       cantidad,
       motivo,
+      expiry_date,
       userId: req.user.id,
     });
     res.json(result);

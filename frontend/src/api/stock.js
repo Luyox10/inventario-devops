@@ -1,6 +1,6 @@
 import { apiFetch } from './http';
 
-export function updateStockMovimiento({ token, productoId, tipo, cantidad, motivo }) {
+export function updateStockMovimiento({ token, productoId, tipo, cantidad, motivo, expiry_date }) {
   return apiFetch(`/api/stock/${productoId}`, {
     method: 'PUT',
     token,
@@ -8,6 +8,7 @@ export function updateStockMovimiento({ token, productoId, tipo, cantidad, motiv
       tipo,
       cantidad,
       motivo,
+      expiry_date,
     },
   });
 }

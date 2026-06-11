@@ -44,6 +44,8 @@ async function crearVenta({ usuarioId, items }) {
       const nextStock = Number(it.producto.stock_actual) - Number(it.cantidad);
       await ventaModel.updateProductoStock(connection, { producto_id: it.producto_id, stock_actual: nextStock });
 
+      const lotesUsados = await ventaModel.allocateLotesForSale(connection, it.producto_id, it.cantidad);
+
       await ventaModel.createMovimiento(connection, {
         producto_id: it.producto_id,
         usuario_id: usuarioId,
