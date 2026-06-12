@@ -64,12 +64,16 @@ async function listProductos({ includeInactive = false } = {}) {
             p.activo,
             p.created_at,
             p.updated_at,
-            COALESCE(MIN(l.expiry_date), p.expiry_date) AS expiry_date,
-            DATEDIFF(COALESCE(MIN(l.expiry_date), p.expiry_date), CURRENT_DATE()) AS days_to_expire
+            COALESCE(l.min_expiry, p.expiry_date) AS expiry_date,
+            DATEDIFF(COALESCE(l.min_expiry, p.expiry_date), CURRENT_DATE()) AS days_to_expire
      FROM productos p
-     LEFT JOIN lotes l ON l.producto_id = p.id AND l.activo = 1 AND l.expiry_date IS NOT NULL
+     LEFT JOIN (
+       SELECT producto_id, MIN(expiry_date) AS min_expiry
+       FROM lotes
+       WHERE activo = 1 AND expiry_date IS NOT NULL
+       GROUP BY producto_id
+     ) l ON l.producto_id = p.id
      ${where}
-     GROUP BY p.id
      ORDER BY p.id DESC`
   );
   return rows;
@@ -88,12 +92,16 @@ async function getProductoById(id) {
             p.activo,
             p.created_at,
             p.updated_at,
-            COALESCE(MIN(l.expiry_date), p.expiry_date) AS expiry_date,
-            DATEDIFF(COALESCE(MIN(l.expiry_date), p.expiry_date), CURRENT_DATE()) AS days_to_expire
+            COALESCE(l.min_expiry, p.expiry_date) AS expiry_date,
+            DATEDIFF(COALESCE(l.min_expiry, p.expiry_date), CURRENT_DATE()) AS days_to_expire
      FROM productos p
-     LEFT JOIN lotes l ON l.producto_id = p.id AND l.activo = 1 AND l.expiry_date IS NOT NULL
+     LEFT JOIN (
+       SELECT producto_id, MIN(expiry_date) AS min_expiry
+       FROM lotes
+       WHERE activo = 1 AND expiry_date IS NOT NULL
+       GROUP BY producto_id
+     ) l ON l.producto_id = p.id
      WHERE p.id = ?
-     GROUP BY p.id
      LIMIT 1`,
     [id]
   );
