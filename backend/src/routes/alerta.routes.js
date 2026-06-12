@@ -6,5 +6,6 @@ const { authMiddleware } = require('../middlewares/auth.middleware');
 const router = express.Router();
 
 router.get('/stock-bajo', authMiddleware, alertaController.stockBajo);
+router.get('/vencidos', authMiddleware, alertaController.productosVencidos);
 
 module.exports = router;
