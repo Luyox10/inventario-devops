@@ -4,4 +4,8 @@ async function stockBajo() {
   return alertaModel.listStockBajo();
 }
 
-module.exports = { stockBajo };
+async function productosVencidos() {
+  return alertaModel.listProductosVencidos();
+}
+
+module.exports = { stockBajo, productosVencidos };

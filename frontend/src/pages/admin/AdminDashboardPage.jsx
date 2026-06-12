@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { getDashboard } from '../../api/reportes';
-import { listStockBajo } from '../../api/alertas';
+import { listStockBajo, listProductosVencidos } from '../../api/alertas';
 import { listProductos } from '../../api/productos';
 import { listVentas } from '../../api/ventas';
 import { useAuth } from '../../state/auth/AuthContext.jsx';
@@ -212,6 +212,7 @@ export default function AdminDashboardPage() {
   const [productosStats, setProductosStats] = useState({ ok: 0, bajo: 0, sinStock: 0, total: 0 });
   const [alertas, setAlertas] = useState([]);
   const [expiryStats, setExpiryStats] = useState({ proximos: 0, vencidos: 0 });
+  const [productosVencidos, setProductosVencidos] = useState([]);
 
   async function refresh() {
     setError('');
@@ -221,11 +222,12 @@ export default function AdminDashboardPage() {
       const from7 = new Date(today);
       from7.setDate(today.getDate() - 6);
 
-      const [resDashboard, resVentas, resProductos, resAlertas] = await Promise.all([
+      const [resDashboard, resVentas, resProductos, resAlertas, resVencidos] = await Promise.all([
         getDashboard({ token }),
         listVentas({ token, from: startOfDayIso(from7), to: endOfDayIso(today) }),
         listProductos({ token }),
         listStockBajo({ token }),
+        listProductosVencidos({ token }),
       ]);
 
       setData(resDashboard);
@@ -268,6 +270,8 @@ export default function AdminDashboardPage() {
         proximos: Number(resDashboard?.proximos_a_vencer || 0),
         vencidos: Number(resDashboard?.vencidos || 0),
       });
+
+      setProductosVencidos(Array.isArray(resVencidos) ? resVencidos : []);
     } catch (err) {
       if (err.status === 401) logout();
       setError(err.message || 'Error');
@@ -328,6 +332,24 @@ export default function AdminDashboardPage() {
       </div>
 
       {error ? <div style={styles.error}>{error}</div> : null}
+
+      {productosVencidos.length > 0 ? (
+        <div style={styles.alertaVencidos}>
+          <div style={{ fontWeight: 900, color: '#dc2626', marginBottom: 8 }}>
+            ⚠️ {productosVencidos.length} producto(s) vencido(s)
+          </div>
+          {productosVencidos.slice(0, 3).map((p) => (
+            <div key={p.id} style={{ fontSize: 13, color: 'rgba(11, 42, 82, 0.85)', marginBottom: 6 }}>
+              <strong>{p.nombre}</strong> (SKU: {p.sku}) - Vencido desde {p.expiry_date}
+            </div>
+          ))}
+          {productosVencidos.length > 3 ? (
+            <div style={{ fontSize: 12, color: 'rgba(11, 42, 82, 0.65)', marginTop: 8 }}>
+              + {productosVencidos.length - 3} producto(s) más vencido(s)
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div style={styles.kpis}>
         <Link to="/admin/ventas" style={styles.kpiCard}>
@@ -437,6 +459,15 @@ const styles = {
     border: '1px solid rgba(239, 68, 68, 0.35)',
     color: 'rgba(11, 42, 82, 0.92)',
     fontSize: 14,
+    marginBottom: 14,
+  },
+  alertaVencidos: {
+    padding: 14,
+    borderRadius: 12,
+    background: 'rgba(220, 38, 38, 0.08)',
+    border: '2px solid rgba(220, 38, 38, 0.30)',
+    color: 'rgba(11, 42, 82, 0.92)',
+    fontSize: 13,
     marginBottom: 14,
   },
   secondaryBtn: {

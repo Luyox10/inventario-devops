@@ -207,7 +207,7 @@ function normalizeProductoId(id) {
 }
 
 /**
- * Elimina el producto: borrado físico si no hay referencias en ventas/movimientos;
+ * Elimina el producto: FEFO primero los lotes más próximos a vencer, luego borrado físico si no hay referencias;
  * si hay historial, baja lógica (activo = 0). Todo en una conexión para lecturas coherentes (TiDB).
  */
 async function deleteProductoSoft(id) {
@@ -217,10 +217,23 @@ async function deleteProductoSoft(id) {
   const conn = await pool.getConnection();
   try {
     const [existingRows] = await conn.query(
-      'SELECT id FROM productos WHERE id = ? LIMIT 1',
+      'SELECT id, stock_actual FROM productos WHERE id = ? LIMIT 1',
       [pid]
     );
     if (!existingRows.length) return null;
+
+    // Eliminar lotes usando FEFO: primero los más próximos a vencer
+    const [lots] = await conn.query(
+      `SELECT id, cantidad, expiry_date
+       FROM lotes
+       WHERE producto_id = ? AND activo = 1
+       ORDER BY expiry_date IS NULL, expiry_date ASC, id ASC`,
+      [pid]
+    );
+
+    for (const lot of lots) {
+      await conn.query('UPDATE lotes SET cantidad = 0, activo = 0 WHERE id = ?', [lot.id]);
+    }
 
     const [[dv]] = await conn.query(
       'SELECT COUNT(*) AS c FROM detalle_ventas WHERE producto_id = ?',
@@ -235,7 +248,7 @@ async function deleteProductoSoft(id) {
     if (refCount === 0) {
       const [delRes] = await conn.query('DELETE FROM productos WHERE id = ?', [pid]);
       if (!delRes.affectedRows) return null;
-      return { id: pid, eliminado: true, permanente: true };
+      return { id: pid, eliminado: true, permanente: true, lotes_eliminados: lots.length };
     }
 
     await conn.query('UPDATE productos SET activo = 0 WHERE id = ?', [pid]);
@@ -245,7 +258,7 @@ async function deleteProductoSoft(id) {
        FROM productos WHERE id = ? LIMIT 1`,
       [pid]
     );
-    return rows[0] || null;
+    return { ...rows[0], lotes_eliminados: lots.length } || null;
   } finally {
     conn.release();
   }
