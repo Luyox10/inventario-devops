@@ -22,20 +22,30 @@ async function dashboard() {
   const [[expiringProductos]] = await pool.query(
     `SELECT COUNT(DISTINCT p.id) AS proximos_a_vencer
      FROM productos p
-     LEFT JOIN lotes l ON l.producto_id = p.id AND l.activo = 1
+     LEFT JOIN (
+       SELECT producto_id, MIN(expiry_date) AS min_expiry
+       FROM lotes
+       WHERE activo = 1
+       GROUP BY producto_id
+     ) l ON l.producto_id = p.id
      WHERE p.activo = 1
-       AND (COALESCE(MIN(l.expiry_date), p.expiry_date) IS NOT NULL
-            AND COALESCE(MIN(l.expiry_date), p.expiry_date) <= DATE_ADD(CURRENT_DATE(), INTERVAL 7 DAY)
-            AND COALESCE(MIN(l.expiry_date), p.expiry_date) >= CURRENT_DATE())`
+       AND COALESCE(l.min_expiry, p.expiry_date) IS NOT NULL
+       AND COALESCE(l.min_expiry, p.expiry_date) <= DATE_ADD(CURRENT_DATE(), INTERVAL 7 DAY)
+       AND COALESCE(l.min_expiry, p.expiry_date) >= CURRENT_DATE()`
   );
 
   const [[expiredProductos]] = await pool.query(
     `SELECT COUNT(DISTINCT p.id) AS vencidos
      FROM productos p
-     LEFT JOIN lotes l ON l.producto_id = p.id AND l.activo = 1
+     LEFT JOIN (
+       SELECT producto_id, MIN(expiry_date) AS min_expiry
+       FROM lotes
+       WHERE activo = 1
+       GROUP BY producto_id
+     ) l ON l.producto_id = p.id
      WHERE p.activo = 1
-       AND (COALESCE(MIN(l.expiry_date), p.expiry_date) IS NOT NULL
-            AND COALESCE(MIN(l.expiry_date), p.expiry_date) < CURRENT_DATE())`
+       AND COALESCE(l.min_expiry, p.expiry_date) IS NOT NULL
+       AND COALESCE(l.min_expiry, p.expiry_date) < CURRENT_DATE()`
   );
 
   return {
