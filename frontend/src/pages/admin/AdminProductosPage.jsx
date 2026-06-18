@@ -55,11 +55,9 @@ export default function AdminProductosPage() {
     if (!expiry_date) {
       return <span style={{ color: 'rgba(11,42,82,0.5)', fontStyle: 'italic' }}>SIN VENCIMIENTO</span>;
     }
-    const expiry = new Date(expiry_date);
-    const dd = String(expiry.getDate()).padStart(2, '0');
-    const mm = String(expiry.getMonth() + 1).padStart(2, '0');
-    const yyyy = expiry.getFullYear();
-    return <span style={{ color: 'rgba(11,42,82,0.7)' }}>{`${dd}/${mm}/${yyyy}`}</span>;
+    const parts = String(expiry_date).slice(0, 10).split('-');
+    if (parts.length !== 3) return <span style={{ color: 'rgba(11,42,82,0.7)' }}>{expiry_date}</span>;
+    return <span style={{ color: 'rgba(11,42,82,0.7)' }}>{`${parts[2]}/${parts[1]}/${parts[0]}`}</span>;
   }
 
   const deleteConfirm = useMemo(() => {
