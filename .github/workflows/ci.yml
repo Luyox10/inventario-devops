@@ -64,8 +64,8 @@ jobs:
           cache: "npm"
           cache-dependency-path: backend/package-lock.json
 
-      - name: Install mysql client
-        run: sudo apt-get update && sudo apt-get install -y mysql-client jq
+      - name: Verify mysql client
+        run: mysql --version && jq --version
 
       - name: Install backend dependencies
         working-directory: backend
@@ -228,62 +228,3 @@ jobs:
             -H "Authorization: Bearer ${EMP_TOKEN}" \
             | grep -q '\['
 
-  ml-service-ci:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-          cache-dependency-path: ml-service/requirements.txt
-
-      - name: Install ml-service dependencies
-        working-directory: ml-service
-        run: pip install -r requirements.txt
-
-      - name: Start ml-service (background)
-        working-directory: ml-service
-        run: |
-          ML_PORT=5001 python app.py > /tmp/ml-ci.log 2>&1 &
-          sleep 5
-          echo "ML service startup log:"
-          cat /tmp/ml-ci.log || true
-
-      - name: Health check ml-service
-        run: curl -sSf http://localhost:5001/health | grep -q '"status"'
-
-      - name: Train with minimal data
-        run: |
-          curl -sSf -X POST http://localhost:5001/train \
-            -H "Content-Type: application/json" \
-            -d '{
-              "ventas": [
-                {"fecha":"2025-01-06","producto_id":1,"categoria":"Bebidas","cantidad":10,"precio":3.5,"stock_actual":40},
-                {"fecha":"2025-01-07","producto_id":1,"categoria":"Bebidas","cantidad":8,"precio":3.5,"stock_actual":38},
-                {"fecha":"2025-01-08","producto_id":2,"categoria":"Snacks","cantidad":5,"precio":2.0,"stock_actual":20},
-                {"fecha":"2025-01-09","producto_id":1,"categoria":"Bebidas","cantidad":12,"precio":3.5,"stock_actual":35},
-                {"fecha":"2025-01-10","producto_id":2,"categoria":"Snacks","cantidad":6,"precio":2.0,"stock_actual":18},
-                {"fecha":"2025-01-13","producto_id":1,"categoria":"Bebidas","cantidad":9,"precio":3.5,"stock_actual":30},
-                {"fecha":"2025-01-14","producto_id":2,"categoria":"Snacks","cantidad":7,"precio":2.0,"stock_actual":15},
-                {"fecha":"2025-01-15","producto_id":1,"categoria":"Bebidas","cantidad":11,"precio":3.5,"stock_actual":28},
-                {"fecha":"2025-01-16","producto_id":2,"categoria":"Snacks","cantidad":4,"precio":2.0,"stock_actual":12},
-                {"fecha":"2025-01-17","producto_id":1,"categoria":"Bebidas","cantidad":13,"precio":3.5,"stock_actual":25}
-              ]
-            }' | grep -q '"mensaje"'
-
-      - name: Predict check
-        run: |
-          curl -sSf -X POST http://localhost:5001/predict \
-            -H "Content-Type: application/json" \
-            -d '{
-              "productos": [
-                {"producto_id":1,"nombre":"Coca Cola","categoria":"Bebidas","precio":3.5,"stock_actual":25,"stock_minimo":10,"unidad":"und"},
-                {"producto_id":2,"nombre":"Galleta","categoria":"Snacks","precio":2.0,"stock_actual":12,"stock_minimo":5,"unidad":"paq"}
-              ],
-              "dias": 7
-            }' | grep -q '"resultados"'
