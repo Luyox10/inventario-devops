@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 import { listProductos } from '../../api/productos';
 import { setStockActual, updateStockMinimo, updateStockMovimiento } from '../../api/stock';
+import { getLotesByProducto, ajustarLote } from '../../api/lotes';
 import { useAuth } from '../../state/auth/AuthContext.jsx';
 
 const MOTIVO_OPTIONS = [
@@ -21,6 +22,8 @@ function emptyRowAction() {
     motivoPreset: '',
     motivoOtro: '',
     minimo: '',
+    expiry_date: '',
+    lote_id: '',
     saving: false,
   };
 }
@@ -38,6 +41,7 @@ export default function AdminStockPage() {
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
   const [hoverId, setHoverId] = useState(null);
+  const [lotesMap, setLotesMap] = useState({});
 
   const isAdmin = user?.rol === 'ADMIN';
 
@@ -168,8 +172,8 @@ export default function AdminStockPage() {
     setError('');
     setAction(r.id, { saving: true });
     try {
-      await updateStockMovimiento({ token, productoId: r.id, tipo, cantidad: qty, motivo: resolvedMotivo(a) });
-      setAction(r.id, { cantidad: '', motivoPreset: '', motivoOtro: '', saving: false });
+      await updateStockMovimiento({ token, productoId: r.id, tipo, cantidad: qty, motivo: resolvedMotivo(a), expiry_date: tipo === 'ENTRADA' ? (a.expiry_date || undefined) : undefined });
+      setAction(r.id, { cantidad: '', motivoPreset: '', motivoOtro: '', expiry_date: '', saving: false });
       await refresh();
     } catch (err) {
       if (err.status === 401) logout();
@@ -178,20 +182,44 @@ export default function AdminStockPage() {
     }
   }
 
+  async function loadLotesForProduct(productoId) {
+    try {
+      const data = await getLotesByProducto({ token, productoId });
+      const arr = Array.isArray(data) ? data : [];
+      setLotesMap((prev) => ({ ...prev, [productoId]: arr }));
+      return arr;
+    } catch {
+      return [];
+    }
+  }
+
+  async function onModoChange(r, newModo) {
+    setAction(r.id, { modo: newModo, lote_id: '', cantidad: '' });
+    if (newModo === 'AJUSTE') {
+      await loadLotesForProduct(r.id);
+    }
+  }
+
   async function doAjuste(r) {
     const a = getAction(r.id);
-    const nextStock = Number(a.cantidad);
+    const loteId = Number(a.lote_id);
+    const nuevaCantidad = Number(a.cantidad);
 
-    if (a.cantidad === '' || Number.isNaN(nextStock) || nextStock < 0) {
-      setError('Ingresa un stock válido para ajustar');
+    if (!loteId) {
+      setError('Selecciona un lote para ajustar');
+      return;
+    }
+    if (a.cantidad === '' || Number.isNaN(nuevaCantidad) || nuevaCantidad < 0) {
+      setError('Ingresa una cantidad válida');
       return;
     }
 
     setError('');
     setAction(r.id, { saving: true });
     try {
-      await setStockActual({ token, productoId: r.id, stock_actual: nextStock, motivo: resolvedMotivo(a) });
-      setAction(r.id, { cantidad: '', motivoPreset: '', motivoOtro: '', saving: false });
+      await ajustarLote({ token, loteId, nueva_cantidad: nuevaCantidad, motivo: resolvedMotivo(a) });
+      setAction(r.id, { cantidad: '', motivoPreset: '', motivoOtro: '', lote_id: '', saving: false });
+      setLotesMap((prev) => ({ ...prev, [r.id]: undefined }));
       await refresh();
     } catch (err) {
       if (err.status === 401) logout();
@@ -308,6 +336,7 @@ export default function AdminStockPage() {
                   </th>
                   <th style={{ ...styles.th, ...styles.thSticky }}>Movimiento</th>
                   <th style={{ ...styles.th, ...styles.thSticky }}>Cantidad</th>
+                  <th style={{ ...styles.th, ...styles.thSticky }}>Vto. lote</th>
                   <th style={{ ...styles.th, ...styles.thSticky }}>Motivo</th>
                   <th style={{ ...styles.thRight, ...styles.thSticky }}>Acciones</th>
                 </tr>
@@ -343,7 +372,7 @@ export default function AdminStockPage() {
                       <td style={styles.td}>
                         <select
                           value={a.modo}
-                          onChange={(e) => setAction(r.id, { modo: e.target.value })}
+                          onChange={(e) => onModoChange(r, e.target.value)}
                           style={styles.selectSmall}
                         >
                           <option value="ENTRADA">Entrada</option>
@@ -358,9 +387,38 @@ export default function AdminStockPage() {
                           type="number"
                           step="1"
                           min="0"
-                          placeholder={a.modo === 'AJUSTE' ? 'Stock' : 'Cantidad'}
+                          placeholder={a.modo === 'AJUSTE' ? 'Nueva cantidad' : 'Cantidad'}
                           style={styles.inputSmall}
                         />
+                      </td>
+                      <td style={styles.td}>
+                        {a.modo === 'ENTRADA' ? (
+                          <input
+                            value={a.expiry_date}
+                            onChange={(e) => setAction(r.id, { expiry_date: e.target.value })}
+                            type="date"
+                            style={styles.inputSmall}
+                            title="Fecha de vencimiento del lote (opcional)"
+                          />
+                        ) : a.modo === 'AJUSTE' ? (
+                          <select
+                            value={a.lote_id}
+                            onChange={(e) => setAction(r.id, { lote_id: e.target.value })}
+                            style={styles.selectSmall}
+                          >
+                            <option value="">Seleccionar lote</option>
+                            {(lotesMap[r.id] || []).map((l) => {
+                              const fecha = l.expiry_date ? new Date(l.expiry_date).toLocaleDateString('es-PE') : 'Sin fecha';
+                              return (
+                                <option key={l.id} value={l.id}>
+                                  #{l.id} · {l.cantidad} uds · {fecha}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        ) : (
+                          <span style={styles.mutedCell}>—</span>
+                        )}
                       </td>
                       <td style={styles.td}>
                         <div style={styles.motivoWrap}>
@@ -667,6 +725,7 @@ const styles = {
   badgeOk: { background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.35)', color: '#065f46' },
   badgeWarn: { background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.35)', color: '#92400e' },
   badgeDanger: { background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.35)', color: '#7f1d1d' },
+  mutedCell: { color: 'rgba(11,42,82,0.35)', fontSize: 13 },
   rowEven: { background: 'rgba(255,255,255,0.10)' },
   rowOdd: { background: 'rgba(255,255,255,0.04)' },
   rowHover: { background: 'rgba(11, 42, 82, 0.06)' },

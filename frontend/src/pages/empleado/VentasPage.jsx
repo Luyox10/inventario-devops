@@ -86,6 +86,23 @@ const VentasPage = () => {
     };
   }, [token, logout]);
 
+  function isVencido(p) {
+    if (!p?.expiry_date) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiry = new Date(p.expiry_date);
+    expiry.setHours(0, 0, 0, 0);
+    return expiry <= today;
+  }
+
+  function sinStock(p) {
+    return Number(p?.stock_actual || 0) <= 0;
+  }
+
+  function isDisponible(p) {
+    return !isVencido(p) && !sinStock(p);
+  }
+
   const manejarEnvio = async (e) => {
     e.preventDefault();
     setStatus({ type: 'info', msg: 'Procesando venta...' });
@@ -96,6 +113,10 @@ const VentasPage = () => {
       let producto = productoResolved;
 
       if (!producto) throw new Error('Producto no encontrado');
+      if (isVencido(producto)) throw new Error(`El producto "${producto.nombre}" está vencido y no puede venderse.`);
+      if (sinStock(producto)) throw new Error(`El producto "${producto.nombre}" no tiene stock disponible.`);
+      const cantidadSolicitada = Number(venta.cantidad);
+      if (cantidadSolicitada > Number(producto.stock_actual || 0)) throw new Error(`Stock insuficiente. Disponible: ${producto.stock_actual} ${producto.unidad || 'uds'}.`);
 
       const producto_id = Number(producto.id);
       const cantidad = Number(venta.cantidad);
@@ -186,18 +207,25 @@ const VentasPage = () => {
                       <button
                         key={p.id}
                         type="button"
-                        style={{ ...styles.autoItem, ...(selected ? styles.autoItemActive : null) }}
+                        style={{ ...styles.autoItem, ...(selected ? styles.autoItemActive : null), ...(!isDisponible(p) ? (isVencido(p) ? styles.autoItemVencido : styles.autoItemSinStock) : {}) }}
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
+                          if (!isDisponible(p)) return;
                           setProductoId(String(p.id));
                           setProductoQuery(p.sku ? `${p.nombre} (${p.sku})` : p.nombre);
                           setProductoOpen(false);
                         }}
+                        disabled={!isDisponible(p)}
                       >
-                        <div style={styles.autoTitle}>{p.nombre}</div>
+                        <div style={{ ...styles.autoTitle, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {p.nombre}
+                          {isVencido(p) && <span style={styles.vencidoBadge}>VENCIDO</span>}
+                          {!isVencido(p) && sinStock(p) && <span style={styles.sinStockBadge}>SIN STOCK</span>}
+                        </div>
                         <div style={styles.autoMeta}>
                           {p.sku ? `SKU: ${p.sku}` : 'Sin SKU'}
                           {p.unidad ? ` · ${p.unidad}` : ''}
+                          {` · Stock: ${p.stock_actual ?? 0}`}
                         </div>
                       </button>
                     );
@@ -294,8 +322,34 @@ const styles = {
     borderBottom: '1px solid rgba(11, 42, 82, 0.08)',
   },
   autoItemActive: { background: 'rgba(11, 42, 82, 0.08)' },
+  autoItemVencido: { opacity: 0.55, cursor: 'not-allowed', background: 'rgba(239, 68, 68, 0.06)' },
+  autoItemSinStock: { opacity: 0.55, cursor: 'not-allowed', background: 'rgba(245, 158, 11, 0.06)' },
   autoTitle: { fontWeight: 900, color: '#0b2a52', fontSize: 13 },
   autoMeta: { marginTop: 4, fontWeight: 800, color: 'rgba(11, 42, 82, 0.65)', fontSize: 12 },
+  vencidoBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '2px 7px',
+    borderRadius: 999,
+    fontSize: 10,
+    fontWeight: 900,
+    letterSpacing: 0.5,
+    background: 'rgba(239, 68, 68, 0.15)',
+    border: '1px solid rgba(239, 68, 68, 0.35)',
+    color: '#dc2626',
+  },
+  sinStockBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '2px 7px',
+    borderRadius: 999,
+    fontSize: 10,
+    fontWeight: 900,
+    letterSpacing: 0.5,
+    background: 'rgba(245, 158, 11, 0.15)',
+    border: '1px solid rgba(245, 158, 11, 0.35)',
+    color: '#b45309',
+  },
   totalBox: {
     padding: '14px 16px',
     borderRadius: '16px',

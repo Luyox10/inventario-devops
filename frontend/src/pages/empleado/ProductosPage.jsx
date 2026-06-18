@@ -141,7 +141,7 @@ const ProductosPage = () => {
                   {sortLabel('sku', 'SKU')}
                 </th>
                 <th style={styles.thBtn} onClick={() => toggleSort('precio')} role="button" title="Ordenar">
-                  {sortLabel('precio', 'PRECIO UNITARIO')}
+                  {sortLabel('precio', 'PRECIO')}
                 </th>
                 <th style={styles.thBtn} onClick={() => toggleSort('stock_actual')} role="button" title="Ordenar">
                   {sortLabel('stock_actual', 'STOCK DISPONIBLE')}
@@ -169,7 +169,7 @@ const ProductosPage = () => {
                           fontSize: '12px',
                         }}
                       >
-                        {stock} unidades
+                        {stock} {p.unidad || 'uds'}
                       </span>
                     </td>
                   </tr>

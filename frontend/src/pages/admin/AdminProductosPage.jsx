@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { createProducto, deleteProducto, listProductos, updateProducto } from '../../api/productos';
+import { getLotesByProducto, updateLoteExpiry, darDeBajaLote } from '../../api/lotes';
 import { useAuth } from '../../state/auth/AuthContext.jsx';
 
 function emptyForm() {
@@ -43,6 +44,23 @@ export default function AdminProductosPage() {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState(emptyForm());
   const [editSaving, setEditSaving] = useState(false);
+
+  const [lotes, setLotes] = useState([]);
+  const [lotesLoading, setLotesLoading] = useState(false);
+  const [loteEdits, setLoteEdits] = useState({});
+  const [loteSaving, setLoteSaving] = useState({});
+  const [loteError, setLoteError] = useState('');
+
+  function vencimientoFor(expiry_date) {
+    if (!expiry_date) {
+      return <span style={{ color: 'rgba(11,42,82,0.5)', fontStyle: 'italic' }}>SIN VENCIMIENTO</span>;
+    }
+    const expiry = new Date(expiry_date);
+    const dd = String(expiry.getDate()).padStart(2, '0');
+    const mm = String(expiry.getMonth() + 1).padStart(2, '0');
+    const yyyy = expiry.getFullYear();
+    return <span style={{ color: 'rgba(11,42,82,0.7)' }}>{`${dd}/${mm}/${yyyy}`}</span>;
+  }
 
   const deleteConfirm = useMemo(() => {
     return (row) => {
@@ -172,7 +190,7 @@ export default function AdminProductosPage() {
     setEditForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function startEdit(row) {
+  async function startEdit(row) {
     setEditingId(row.id);
     setEditForm({
       nombre: row.nombre ?? '',
@@ -185,7 +203,64 @@ export default function AdminProductosPage() {
       stock_minimo: String(row.stock_minimo ?? ''),
     });
     setError('');
+    setLotes([]);
+    setLoteEdits({});
+    setLoteSaving({});
+    setLoteError('');
     setEditOpen(true);
+    setLotesLoading(true);
+    try {
+      const data = await getLotesByProducto({ token, productoId: row.id });
+      const arr = Array.isArray(data) ? data : [];
+      setLotes(arr);
+      const edits = {};
+      arr.forEach((l) => { edits[l.id] = l.expiry_date ? String(l.expiry_date).slice(0, 10) : ''; });
+      setLoteEdits(edits);
+    } catch (err) {
+      if (err.status === 401) logout();
+      setLoteError('No se pudieron cargar los lotes');
+    } finally {
+      setLotesLoading(false);
+    }
+  }
+
+  async function recargarLotes() {
+    const updated = await getLotesByProducto({ token, productoId: editingId });
+    const arr = Array.isArray(updated) ? updated : [];
+    setLotes(arr);
+    const edits = {};
+    arr.forEach((l) => { edits[l.id] = l.expiry_date ? String(l.expiry_date).slice(0, 10) : ''; });
+    setLoteEdits(edits);
+    await refresh();
+  }
+
+  async function saveLoteExpiry(loteId) {
+    setLoteError('');
+    setLoteSaving((prev) => ({ ...prev, [loteId]: true }));
+    try {
+      await updateLoteExpiry({ token, loteId, expiry_date: loteEdits[loteId] || null });
+      await recargarLotes();
+    } catch (err) {
+      if (err.status === 401) logout();
+      setLoteError(err.message || 'Error al guardar lote');
+    } finally {
+      setLoteSaving((prev) => ({ ...prev, [loteId]: false }));
+    }
+  }
+
+  async function bajaLote(loteId, cantidad) {
+    if (!window.confirm(`¿Dar de baja el lote #${loteId} (${cantidad} unidades)? Se descontará del stock.`)) return;
+    setLoteError('');
+    setLoteSaving((prev) => ({ ...prev, [loteId]: true }));
+    try {
+      await darDeBajaLote({ token, loteId });
+      await recargarLotes();
+    } catch (err) {
+      if (err.status === 401) logout();
+      setLoteError(err.message || 'Error al dar de baja el lote');
+    } finally {
+      setLoteSaving((prev) => ({ ...prev, [loteId]: false }));
+    }
   }
 
   async function onSubmit(e) {
@@ -474,6 +549,7 @@ export default function AdminProductosPage() {
                     <div style={styles.mobileRow}><span style={styles.mobileLabel}>Precio</span><span style={styles.mobileValue}>S/ {Number(r.precio).toFixed(2)}</span></div>
                     <div style={styles.mobileRow}><span style={styles.mobileLabel}>Stock</span><span style={styles.mobileValue}>{actual}</span></div>
                     <div style={styles.mobileRow}><span style={styles.mobileLabel}>Estado</span><span style={styles.mobileValue}>{estadoLabel}</span></div>
+                    <div style={styles.mobileRow}><span style={styles.mobileLabel}>Vencimiento</span><span style={styles.mobileValue}>{vencimientoFor(r.expiry_date)}</span></div>
                     <div style={styles.mobileActions}>
                       <button style={styles.smallBtn} onClick={() => startEdit(r)} title="Editar">✏️ Editar</button>
                       <button style={styles.smallDangerBtn} onClick={() => onDelete(r)} title="Eliminar">🗑️ Eliminar</button>
@@ -533,6 +609,7 @@ export default function AdminProductosPage() {
                         Estado{sortKey === 'estado' ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
                       </button>
                     </th>
+                    <th style={styles.thSticky}>Vencimiento</th>
                     <th style={styles.thRightSticky}>Acciones</th>
                   </tr>
                 </thead>
@@ -568,6 +645,7 @@ export default function AdminProductosPage() {
                               ? 'BAJO'
                               : 'OK'}
                         </td>
+                        <td style={styles.td}>{vencimientoFor(r.expiry_date)}</td>
                         <td style={styles.tdRight}>
                           <button style={styles.smallBtn} onClick={() => startEdit(r)} title="Editar">
                             ✏️ Editar
@@ -689,6 +767,64 @@ export default function AdminProductosPage() {
               </div>
 
               {error ? <div style={styles.error}>{error}</div> : null}
+
+              <div style={styles.lotesSection}>
+                <div style={styles.lotesSectionTitle}>Lotes activos</div>
+                {lotesLoading ? (
+                  <div style={styles.muted}>Cargando lotes...</div>
+                ) : lotes.length === 0 ? (
+                  <div style={styles.muted}>Sin lotes registrados.</div>
+                ) : (
+                  <table style={styles.lotesTable}>
+                    <thead>
+                      <tr>
+                        <th style={styles.lotesTh}>Lote #</th>
+                        <th style={styles.lotesTh}>Cantidad</th>
+                        <th style={styles.lotesTh}>Fecha vencimiento</th>
+                        <th style={styles.lotesTh}>Guardar fecha</th>
+                        <th style={styles.lotesTh}>Dar de baja</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lotes.map((l) => (
+                        <tr key={l.id}>
+                          <td style={styles.lotesTd}>{l.id}</td>
+                          <td style={styles.lotesTd}>{l.cantidad}</td>
+                          <td style={styles.lotesTd}>
+                            <input
+                              type="date"
+                              value={loteEdits[l.id] ?? ''}
+                              onChange={(e) => setLoteEdits((prev) => ({ ...prev, [l.id]: e.target.value }))}
+                              style={styles.lotesInput}
+                            />
+                          </td>
+                          <td style={styles.lotesTd}>
+                            <button
+                              type="button"
+                              style={styles.lotesSaveBtn}
+                              disabled={loteSaving[l.id]}
+                              onClick={() => saveLoteExpiry(l.id)}
+                            >
+                              {loteSaving[l.id] ? 'Guardando...' : 'Guardar'}
+                            </button>
+                          </td>
+                          <td style={styles.lotesTd}>
+                            <button
+                              type="button"
+                              style={styles.lotesBajaBtn}
+                              disabled={loteSaving[l.id]}
+                              onClick={() => bajaLote(l.id, l.cantidad)}
+                            >
+                              Dar de baja
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {loteError ? <div style={{ ...styles.error, marginTop: 8 }}>{loteError}</div> : null}
+              </div>
 
               <div style={styles.modalFooter}>
                 <button type="button" style={styles.secondaryBtn} onClick={() => setEditOpen(false)}>
@@ -884,6 +1020,30 @@ const styles = {
     whiteSpace: 'nowrap',
     textAlign: 'right',
   },
+  badgeDanger: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '4px 10px',
+    borderRadius: 999,
+    fontWeight: 900,
+    fontSize: 11,
+    letterSpacing: 0.6,
+    background: 'rgba(239, 68, 68, 0.15)',
+    border: '1px solid rgba(239, 68, 68, 0.35)',
+    color: '#7f1d1d',
+  },
+  badgeWarn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '4px 10px',
+    borderRadius: 999,
+    fontWeight: 900,
+    fontSize: 11,
+    letterSpacing: 0.6,
+    background: 'rgba(245, 158, 11, 0.15)',
+    border: '1px solid rgba(245, 158, 11, 0.35)',
+    color: '#92400e',
+  },
   trOk: {
     background: 'rgba(16, 185, 129, 0.08)',
   },
@@ -966,4 +1126,41 @@ const styles = {
   mobileLabel: { color: 'rgba(11, 42, 82, 0.68)', fontWeight: 900, fontSize: 12 },
   mobileValue: { color: '#0b2a52', fontWeight: 800, fontSize: 13, textAlign: 'right', overflowWrap: 'anywhere' },
   mobileActions: { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', marginTop: 12 },
+  lotesSection: {
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 12,
+    background: 'rgba(11,42,82,0.05)',
+    border: '1px solid rgba(11,42,82,0.12)',
+  },
+  lotesSectionTitle: { fontWeight: 900, color: '#0b2a52', fontSize: 14, marginBottom: 10 },
+  lotesTable: { width: '100%', borderCollapse: 'collapse' },
+  lotesTh: {
+    textAlign: 'left', fontSize: 11, fontWeight: 900,
+    color: 'rgba(11,42,82,0.65)', padding: '6px 8px',
+    borderBottom: '1px solid rgba(11,42,82,0.12)',
+  },
+  lotesTd: {
+    fontSize: 13, color: '#0b2a52', padding: '8px 8px',
+    borderBottom: '1px solid rgba(11,42,82,0.07)',
+    verticalAlign: 'middle',
+  },
+  lotesInput: {
+    padding: '6px 8px', borderRadius: 8,
+    border: '1px solid rgba(11,42,82,0.18)',
+    background: 'rgba(255,255,255,0.7)',
+    color: '#0b2a52', fontSize: 13, outline: 'none',
+  },
+  lotesSaveBtn: {
+    padding: '6px 12px', borderRadius: 8,
+    border: '1px solid rgba(11,42,82,0.22)',
+    background: 'rgba(11,42,82,0.10)',
+    color: '#0b2a52', fontWeight: 900, fontSize: 12, cursor: 'pointer',
+  },
+  lotesBajaBtn: {
+    padding: '6px 12px', borderRadius: 8,
+    border: '1px solid rgba(239,68,68,0.35)',
+    background: 'rgba(239,68,68,0.10)',
+    color: '#7f1d1d', fontWeight: 900, fontSize: 12, cursor: 'pointer',
+  },
 };

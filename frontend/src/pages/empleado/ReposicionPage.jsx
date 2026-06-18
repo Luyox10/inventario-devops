@@ -7,6 +7,7 @@ import { useAuth } from '../../state/auth/AuthContext.jsx';
 const ReposicionPage = () => {
   const { token, logout } = useAuth();
   const [form, setForm] = useState({ cantidad: '', expiry_date: '' });
+  const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState({ type: '', msg: '' });
   const [productos, setProductos] = useState([]);
   const [loadingProductos, setLoadingProductos] = useState(true);
@@ -64,38 +65,52 @@ const ReposicionPage = () => {
     };
   }, [token, logout]);
 
+  const productoResolved = useMemo(() => {
+    if (productoSelected) return productoSelected;
+    const q = productoQuery.trim().toLowerCase();
+    if (!q) return null;
+    return productos.find((p) => String(p.sku || '').trim().toLowerCase() === q) || null;
+  }, [productoSelected, productoQuery, productos]);
+
+  const expiryRequerida = useMemo(() => {
+    return !!(productoResolved?.expiry_date);
+  }, [productoResolved]);
+
   const handleReposicion = async (e) => {
     e.preventDefault();
     setStatus({ type: 'info', msg: 'Procesando...' });
-    
+    setSubmitting(true);
     try {
       if (loadingProductos) throw new Error('Cargando catálogo de productos...');
 
-      let producto = productoSelected;
-      if (!producto) {
-        const q = productoQuery.trim().toLowerCase();
-        if (!q) throw new Error('Selecciona un producto');
+      const producto = productoResolved;
+      if (!producto) throw new Error('Producto no encontrado. Selecciónalo del listado.');
 
-        const exactSku = productos.find((p) => String(p.sku || '').trim().toLowerCase() === q);
-        if (exactSku) producto = exactSku;
-      }
-
-      if (!producto) throw new Error('Producto no encontrado');
-
-      const productoId = Number(producto.id);
+      const pid = Number(producto.id);
       const cantidad = Number(form.cantidad);
-      if (!productoId || Number.isNaN(productoId) || productoId <= 0) throw new Error('Producto inválido');
+      if (!pid || Number.isNaN(pid) || pid <= 0) throw new Error('Producto inválido');
       if (!cantidad || Number.isNaN(cantidad) || cantidad <= 0) throw new Error('Cantidad inválida');
+      if (expiryRequerida && !form.expiry_date) throw new Error('Este producto requiere fecha de vencimiento.');
 
-      await updateStockMovimiento({ token, productoId, tipo: 'ENTRADA', cantidad, motivo: 'Reposición', expiry_date });
-      setStatus({ type: 'success', msg: '✅ Stock actualizado correctamente en el sistema.' });
+      await updateStockMovimiento({
+        token,
+        productoId: pid,
+        tipo: 'ENTRADA',
+        cantidad,
+        motivo: 'Reposición',
+        expiry_date: form.expiry_date || null,
+      });
 
+      setStatus({ type: 'success', msg: `✅ Nuevo lote de ${cantidad} ${producto.unidad || 'uds'} registrado correctamente.` });
       setProductoId('');
       setProductoQuery('');
       setProductoOpen(false);
       setForm({ cantidad: '', expiry_date: '' });
+      setTimeout(() => setStatus({ type: '', msg: '' }), 4000);
     } catch (error) {
-      setStatus({ type: 'error', msg: '❌ Error: ' + error.message });
+      setStatus({ type: 'error', msg: '❌ ' + error.message });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -168,6 +183,7 @@ const ReposicionPage = () => {
                       <div style={styles.autoMeta}>
                         {p.sku ? `SKU: ${p.sku}` : 'Sin SKU'}
                         {p.unidad ? ` · ${p.unidad}` : ''}
+                        {` · Stock actual: ${p.stock_actual ?? 0}`}
                       </div>
                     </button>
                   );
@@ -190,17 +206,30 @@ const ReposicionPage = () => {
         </div>
 
         <div style={styles.inputGroup}>
-          <label style={styles.label}>FECHA DE VENCIMIENTO (OPCIONAL)</label>
-          <input 
-            type="date" 
+          <label style={styles.label}>
+            FECHA DE VENCIMIENTO DEL LOTE
+            {expiryRequerida && <span style={styles.required}> * REQUERIDA</span>}
+          </label>
+          <input
+            type="date"
             style={styles.input}
-            value={form.expiry_date} 
-            onChange={e => setForm({...form, expiry_date: e.target.value})} 
+            value={form.expiry_date}
+            onChange={e => setForm({ ...form, expiry_date: e.target.value })}
+            required={expiryRequerida}
+            min={new Date().toISOString().slice(0, 10)}
           />
+          {productoResolved && (
+            <div style={styles.expiryHint}>
+              Lote actual más próximo a vencer:{' '}
+              <strong>{productoResolved.expiry_date
+                ? new Date(productoResolved.expiry_date + 'T00:00:00').toLocaleDateString('es-PE')
+                : 'Sin fecha'}</strong>
+            </div>
+          )}
         </div>
 
-        <button type="submit" style={styles.button}>
-          Actualizar Inventario
+        <button type="submit" style={{ ...styles.button, ...(submitting ? { opacity: 0.7, cursor: 'not-allowed' } : {}) }} disabled={submitting}>
+          {submitting ? 'Registrando lote...' : 'Registrar nuevo lote'}
         </button>
       </form>
     </div>
@@ -257,6 +286,9 @@ const styles = {
     borderBottom: '1px solid rgba(11, 42, 82, 0.08)',
   },
   autoItemActive: { background: 'rgba(11, 42, 82, 0.08)' },
+  required: { fontSize: 10, fontWeight: 900, color: '#dc2626', letterSpacing: 0.3, marginLeft: 2 },
+  optional: { fontSize: 10, fontWeight: 700, color: 'rgba(11,42,82,0.40)', marginLeft: 2 },
+  expiryHint: { fontSize: 11, color: 'rgba(11,42,82,0.55)', fontWeight: 700, marginTop: 2 },
   autoTitle: { fontWeight: 900, color: '#0b2a52', fontSize: 13 },
   autoMeta: { marginTop: 4, fontWeight: 800, color: 'rgba(11, 42, 82, 0.65)', fontSize: 12 },
   button: {

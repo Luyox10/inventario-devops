@@ -311,6 +311,99 @@ async function allocateLotesForSalida(connection, producto_id, cantidad) {
   return allocations;
 }
 
+async function ajustarLote(lote_id, nueva_cantidad, userId, motivo) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [[lote]] = await conn.query(
+      'SELECT id, producto_id, cantidad FROM lotes WHERE id = ? AND activo = 1 FOR UPDATE',
+      [lote_id]
+    );
+    if (!lote) throw Object.assign(new Error('Lote no encontrado o ya inactivo'), { status: 404 });
+
+    const qty = Math.max(0, Number(nueva_cantidad));
+    const delta = Math.abs(qty - Number(lote.cantidad));
+
+    if (qty <= 0) {
+      await conn.query('UPDATE lotes SET cantidad = 0, activo = 0 WHERE id = ?', [lote_id]);
+    } else {
+      await conn.query('UPDATE lotes SET cantidad = ? WHERE id = ?', [qty, lote_id]);
+    }
+
+    const [[{ total }]] = await conn.query(
+      'SELECT COALESCE(SUM(cantidad), 0) AS total FROM lotes WHERE producto_id = ? AND activo = 1',
+      [lote.producto_id]
+    );
+    await conn.query('UPDATE productos SET stock_actual = ? WHERE id = ?', [Number(total), lote.producto_id]);
+
+    await conn.query(
+      `INSERT INTO movimientos (producto_id, usuario_id, venta_id, tipo, cantidad, motivo)
+       VALUES (?, ?, NULL, 'AJUSTE', ?, ?)`,
+      [lote.producto_id, userId, delta, motivo || `Ajuste lote #${lote_id} (${lote.cantidad} → ${qty})`]
+    );
+
+    await conn.commit();
+    return { lote_id, producto_id: lote.producto_id, cantidad_anterior: lote.cantidad, cantidad_nueva: qty, stock_actual: Number(total) };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+async function darDeBajaLote(lote_id, userId) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [[lote]] = await conn.query(
+      'SELECT id, producto_id, cantidad FROM lotes WHERE id = ? AND activo = 1 FOR UPDATE',
+      [lote_id]
+    );
+    if (!lote) throw Object.assign(new Error('Lote no encontrado o ya inactivo'), { status: 404 });
+
+    await conn.query('UPDATE lotes SET cantidad = 0, activo = 0 WHERE id = ?', [lote_id]);
+
+    const [[prod]] = await conn.query('SELECT stock_actual FROM productos WHERE id = ?', [lote.producto_id]);
+    const nextStock = Math.max(0, Number(prod.stock_actual) - Number(lote.cantidad));
+    await conn.query('UPDATE productos SET stock_actual = ? WHERE id = ?', [nextStock, lote.producto_id]);
+
+    await conn.query(
+      `INSERT INTO movimientos (producto_id, usuario_id, venta_id, tipo, cantidad, motivo)
+       VALUES (?, ?, NULL, 'AJUSTE', ?, CONCAT('Baja de lote #', ?))`,
+      [lote.producto_id, userId, lote.cantidad, lote_id]
+    );
+
+    await conn.commit();
+    return { lote_id, producto_id: lote.producto_id, cantidad_retirada: lote.cantidad, stock_actual: nextStock };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
+async function getLotesByProducto(producto_id) {
+  const [rows] = await pool.query(
+    `SELECT id, cantidad, expiry_date, created_at
+     FROM lotes
+     WHERE producto_id = ? AND activo = 1
+     ORDER BY expiry_date IS NULL, expiry_date ASC, id ASC`,
+    [producto_id]
+  );
+  return rows;
+}
+
+async function updateLoteExpiry(lote_id, expiry_date) {
+  const parsed = expiry_date ? expiry_date : null;
+  await pool.query('UPDATE lotes SET expiry_date = ? WHERE id = ? AND activo = 1', [parsed, lote_id]);
+  const [rows] = await pool.query('SELECT id, cantidad, expiry_date, created_at FROM lotes WHERE id = ?', [lote_id]);
+  return rows[0] || null;
+}
+
 module.exports = {
   listProductos,
   getProductoById,
@@ -321,4 +414,8 @@ module.exports = {
   updateStockMinimo,
   createLote,
   allocateLotesForSalida,
+  getLotesByProducto,
+  updateLoteExpiry,
+  darDeBajaLote,
+  ajustarLote,
 };

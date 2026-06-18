@@ -32,11 +32,33 @@ export default function AdminAlertasPage() {
   }, []);
 
   function estadoFor(r) {
-    const actual = Number(r.stock_actual || 0);
-    const minimo = Number(r.stock_minimo || 0);
-    if (actual <= 0) return { key: 'critico', text: 'CRÍTICO', style: styles.badgeDanger };
-    if (actual <= minimo) return { key: 'bajo', text: 'BAJO', style: styles.badgeWarn };
+    const actual = Number(r.stock_actual ?? 0);
+    const minimo = Number(r.stock_minimo ?? 0);
+    if (actual === 0) return { key: 'critico', text: 'CRÍTICO', style: styles.badgeDanger };
+    if (actual > 0 && actual <= minimo) return { key: 'bajo', text: 'BAJO', style: styles.badgeWarn };
     return { key: 'ok', text: 'OK', style: styles.badgeOk };
+  }
+
+  function vencimientoFor(r) {
+    if (!r.expiry_date) {
+      return <span style={{ color: 'rgba(11,42,82,0.5)', fontStyle: 'italic' }}>SIN VENCIMIENTO</span>;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiry = new Date(r.expiry_date);
+    expiry.setHours(0, 0, 0, 0);
+    if (expiry <= today) {
+      return <span style={{ ...styles.badgeBase, ...styles.badgeDanger }}>VENCIDO</span>;
+    }
+    const diffMs = expiry - today;
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays <= 7) {
+      return <span style={{ ...styles.badgeBase, ...styles.badgeWarn }}>PRÓXIMO A VENCER</span>;
+    }
+    const dd = String(expiry.getDate()).padStart(2, '0');
+    const mm = String(expiry.getMonth() + 1).padStart(2, '0');
+    const yyyy = expiry.getFullYear();
+    return <span style={{ color: 'rgba(11,42,82,0.7)' }}>{`${dd}/${mm}/${yyyy}`}</span>;
   }
 
   const filteredSorted = useMemo(() => {
@@ -51,8 +73,18 @@ export default function AdminAlertasPage() {
 
     const arr = rows
       .filter((r) => {
-        const st = estadoFor(r).key;
-        return tab === 'todos' ? true : tab === 'criticos' ? st === 'critico' : tab === 'bajo' ? st === 'bajo' : true;
+        if (tab === 'todos') return true;
+        if (tab === 'criticos') return estadoFor(r).key === 'critico';
+        if (tab === 'bajo') return estadoFor(r).key === 'bajo';
+        if (tab === 'vencidos') {
+          if (!r.expiry_date) return false;
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const expiry = new Date(r.expiry_date);
+          expiry.setHours(0, 0, 0, 0);
+          return expiry <= today;
+        }
+        return true;
       })
       .sort((a, b) => {
         const ua = urgency(a);
@@ -70,7 +102,7 @@ export default function AdminAlertasPage() {
       <header style={styles.header}>
         <div>
           <h2 style={styles.h2}>Alertas</h2>
-          <p style={styles.p}>Productos por debajo del stock mínimo.</p>
+          <p style={styles.p}>Productos con stock crítico, bajo o incidencias de vencimiento.</p>
         </div>
       </header>
 
@@ -81,15 +113,14 @@ export default function AdminAlertasPage() {
           <button type="button" onClick={() => setTab('todos')} style={{ ...styles.tab, ...(tab === 'todos' ? styles.tabActive : null) }}>
             Todos
           </button>
-          <button
-            type="button"
-            onClick={() => setTab('criticos')}
-            style={{ ...styles.tab, ...(tab === 'criticos' ? styles.tabActive : null) }}
-          >
-            Críticos
+          <button type="button" onClick={() => setTab('criticos')} style={{ ...styles.tab, ...(tab === 'criticos' ? styles.tabActive : null) }}>
+            Stock Crítico
           </button>
           <button type="button" onClick={() => setTab('bajo')} style={{ ...styles.tab, ...(tab === 'bajo' ? styles.tabActive : null) }}>
-            Bajo
+            Stock Bajo
+          </button>
+          <button type="button" onClick={() => setTab('vencidos')} style={{ ...styles.tab, ...(tab === 'vencidos' ? styles.tabActive : null) }}>
+            Vencidos
           </button>
         </div>
 
@@ -125,17 +156,7 @@ export default function AdminAlertasPage() {
                         <span style={{ ...styles.badgeBase, ...st.style }}>{st.text}</span>
                       </td>
                         <td style={styles.td}>
-                          {r.expiry_date ? (
-                            r.expiry_status === 'vencido' ? (
-                              <span style={{ ...styles.badgeBase, ...styles.badgeDanger }}>VENCIDO</span>
-                            ) : r.expiry_status === 'por_vencer' ? (
-                              <span style={{ ...styles.badgeBase, ...styles.badgeWarn }}>{String(r.days_to_expire)} días</span>
-                            ) : (
-                              <span style={{ color: 'rgba(11,42,82,0.7)' }}>{r.expiry_date}</span>
-                            )
-                          ) : (
-                            '-'
-                          )}
+                          {vencimientoFor(r)}
                         </td>
                     </tr>
                   );

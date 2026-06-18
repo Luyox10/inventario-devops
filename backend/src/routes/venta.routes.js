@@ -8,5 +8,6 @@ const router = express.Router();
 
 router.post('/', authMiddleware, ventaController.crearVenta);
 router.get('/', authMiddleware, roleMiddleware('ADMIN'), ventaController.listVentas);
+router.get('/:id', authMiddleware, roleMiddleware('ADMIN'), ventaController.getVentaDetalle);
 
 module.exports = router;

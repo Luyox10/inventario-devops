@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Eye } from 'lucide-react';
 
 import { listProductos } from '../../api/productos';
-import { crearVenta, listVentas } from '../../api/ventas';
+import { crearVenta, listVentas, getVentaDetalle } from '../../api/ventas';
 import { useAuth } from '../../state/auth/AuthContext.jsx';
 
 function formatMoney(n) {
@@ -30,6 +31,9 @@ export default function AdminVentasPage() {
 
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+
+  const [detalleModal, setDetalleModal] = useState(null);
+  const [loadingDetalle, setLoadingDetalle] = useState(false);
 
   const [histSort, setHistSort] = useState({ key: 'created_at', dir: 'desc' });
   const [histPageSize, setHistPageSize] = useState(10);
@@ -114,6 +118,15 @@ export default function AdminVentasPage() {
     return map;
   }, [productos]);
 
+  function isVencido(p) {
+    if (!p?.expiry_date) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiry = new Date(p.expiry_date);
+    expiry.setHours(0, 0, 0, 0);
+    return expiry <= today;
+  }
+
   const productoMatches = useMemo(() => {
     const s = productoQuery.trim().toLowerCase();
     if (!s) return [];
@@ -171,6 +184,10 @@ export default function AdminVentasPage() {
       setError('Selecciona un producto');
       return;
     }
+    if (isVencido(p)) {
+      setError(`El producto "${p.nombre}" está vencido y no puede venderse.`);
+      return;
+    }
 
     const qty = Number(cantidad);
     if (Number.isNaN(qty) || qty <= 0) {
@@ -205,6 +222,20 @@ export default function AdminVentasPage() {
 
   function removeItem(producto_id) {
     setCart((prev) => prev.filter((x) => x.producto_id !== producto_id));
+  }
+
+  async function verDetalle(id) {
+    setLoadingDetalle(true);
+    setDetalleModal({ loading: true });
+    try {
+      const data = await getVentaDetalle({ token, id });
+      setDetalleModal(data);
+    } catch (err) {
+      if (err.status === 401) logout();
+      setDetalleModal({ error: err.message || 'Error al cargar detalle' });
+    } finally {
+      setLoadingDetalle(false);
+    }
   }
 
   async function submitVenta() {
@@ -263,11 +294,6 @@ export default function AdminVentasPage() {
                   style={styles.input}
                   disabled={loadingProductos}
                 />
-                {productoSelected ? (
-                  <div style={styles.autocompleteHint}>
-                    Seleccionado: <strong>{productoSelected.nombre}</strong> · Stock {productoSelected.stock_actual}
-                  </div>
-                ) : null}
 
                 {productoOpen && productoMatches.length > 0 ? (
                   <div style={styles.autocompleteMenu}>
@@ -275,15 +301,20 @@ export default function AdminVentasPage() {
                       <button
                         key={p.id}
                         type="button"
-                        style={styles.autocompleteItem}
+                        style={{ ...styles.autocompleteItem, ...(isVencido(p) ? styles.autocompleteItemVencido : {}) }}
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
+                          if (isVencido(p)) return;
                           setProductoId(String(p.id));
                           setProductoQuery(`${p.nombre}${p.sku ? ` (${p.sku})` : ''}`);
                           setProductoOpen(false);
                         }}
+                        disabled={isVencido(p)}
                       >
-                        <div style={styles.autocompleteTitle}>{p.nombre}</div>
+                        <div style={styles.autocompleteTitle}>
+                          {p.nombre}
+                          {isVencido(p) && <span style={styles.vencidoBadge}>VENCIDO</span>}
+                        </div>
                         <div style={styles.autocompleteMeta}>
                           {p.sku ? `SKU: ${p.sku}` : 'SKU: —'} · {p.unidad || 'und'} · Stock {p.stock_actual}
                         </div>
@@ -299,9 +330,12 @@ export default function AdminVentasPage() {
               <input value={cantidad} onChange={(e) => setCantidad(e.target.value)} type="number" min="1" step="1" style={styles.input} />
             </label>
 
-            <button type="button" onClick={addItem} style={styles.primaryBtn} disabled={loadingProductos}>
+            <button type="button" onClick={addItem} style={{ ...styles.primaryBtn, marginTop: 18 }} disabled={loadingProductos}>
               Agregar
             </button>
+          </div>
+          <div style={{ ...styles.autocompleteHint, visibility: productoSelected ? 'visible' : 'hidden' }}>
+            Seleccionado: <strong>{productoSelected?.nombre}</strong> · Stock {productoSelected?.stock_actual}
           </div>
 
           {cart.length === 0 ? (
@@ -431,15 +465,13 @@ export default function AdminVentasPage() {
                     <th style={{ ...styles.th, ...styles.thClickable }} onClick={() => toggleHistSort('usuario')}>
                       {histSortLabel('usuario', 'Usuario')}
                     </th>
-                    <th style={{ ...styles.th, ...styles.thClickable }} onClick={() => toggleHistSort('rol')}>
-                      {histSortLabel('rol', 'Rol')}
-                    </th>
                     <th style={{ ...styles.th, ...styles.thClickable }} onClick={() => toggleHistSort('total')}>
                       {histSortLabel('total', 'Total')}
                     </th>
                     <th style={{ ...styles.th, ...styles.thClickable }} onClick={() => toggleHistSort('created_at')}>
                       {histSortLabel('created_at', 'Fecha')}
                     </th>
+                    <th style={styles.thRight}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -447,11 +479,14 @@ export default function AdminVentasPage() {
                     <tr key={v.id}>
                       <td style={styles.td}>{v.id}</td>
                       <td style={styles.td}>{v.usuario_nombre || v.usuario_email || v.usuario_id}</td>
-                      <td style={styles.td}>
-                        <span style={{ ...styles.roleBadge, ...rolBadgeStyle(v.usuario_rol) }}>{v.usuario_rol || '—'}</span>
-                      </td>
                       <td style={styles.td}>{formatMoney(v.total)}</td>
                       <td style={styles.td}>{new Date(v.created_at).toLocaleString()}</td>
+                      <td style={styles.tdRight}>
+                        <button style={styles.iconBtn} onClick={() => verDetalle(v.id)} title="Ver detalle">
+                          <Eye size={15} strokeWidth={2.5} />
+                          Ver
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -496,6 +531,46 @@ export default function AdminVentasPage() {
           )}
         </div>
       </section>
+
+      {/* Modal detalle venta */}
+      {detalleModal ? (
+        <div style={styles.modalOverlay} onClick={() => setDetalleModal(null)}>
+          <div style={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+            {detalleModal.loading ? (
+              <div style={styles.muted}>Cargando detalle...</div>
+            ) : detalleModal.error ? (
+              <div style={styles.error}>{detalleModal.error}</div>
+            ) : (
+              <>
+                <div style={styles.modalHeader}>
+                  <div>
+                    <div style={styles.modalTitle}>Detalle de venta #{detalleModal.id}</div>
+                    <div style={styles.modalMeta}>
+                      {detalleModal.usuario_nombre || detalleModal.usuario_email} &middot; {new Date(detalleModal.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                  <button style={styles.modalClose} onClick={() => setDetalleModal(null)}>✕</button>
+                </div>
+                <div style={styles.modalItems}>
+                  {Array.isArray(detalleModal.items) && detalleModal.items.map((it, i) => (
+                    <div key={i} style={styles.modalItem}>
+                      <div style={styles.modalItemName}>
+                        {it.cantidad}x {it.producto_nombre}
+                        {it.sku ? <span style={styles.modalItemSku}> ({it.sku})</span> : null}
+                      </div>
+                      <div style={styles.modalItemPrice}>{formatMoney(it.subtotal)}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={styles.modalTotal}>
+                  <span>Total</span>
+                  <span>{formatMoney(detalleModal.total)}</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -536,7 +611,7 @@ const styles = {
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   h3: { margin: 0, color: '#0b2a52', fontSize: 18, fontWeight: 900 },
   muted: { color: 'rgba(11, 42, 82, 0.75)', marginTop: 12 },
-  row: { display: 'grid', gridTemplateColumns: '1.8fr 0.6fr 0.6fr', gap: 12, marginTop: 12, alignItems: 'end' },
+  row: { display: 'grid', gridTemplateColumns: '1.8fr 0.6fr 0.6fr', gap: 12, marginTop: 12, alignItems: 'start' },
   filters: { display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, marginTop: 12, alignItems: 'end' },
   label: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, color: 'rgba(11, 42, 82, 0.85)' },
   input: {
@@ -556,7 +631,7 @@ const styles = {
     color: '#0b2a52',
   },
   autocompleteWrap: { position: 'relative', minWidth: 280 },
-  autocompleteHint: { marginTop: 6, fontSize: 12, fontWeight: 700, color: 'rgba(11, 42, 82, 0.72)' },
+  autocompleteHint: { marginTop: 6, fontSize: 12, fontWeight: 700, color: 'rgba(11, 42, 82, 0.72)', minHeight: 18 },
   autocompleteMenu: {
     position: 'absolute',
     left: 0,
@@ -580,8 +655,25 @@ const styles = {
     background: 'transparent',
     cursor: 'pointer',
   },
-  autocompleteTitle: { fontWeight: 900, color: '#0b2a52', fontSize: 13 },
+  autocompleteTitle: { fontWeight: 900, color: '#0b2a52', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 },
   autocompleteMeta: { marginTop: 4, fontSize: 12, fontWeight: 700, color: 'rgba(11, 42, 82, 0.68)' },
+  autocompleteItemVencido: {
+    opacity: 0.55,
+    cursor: 'not-allowed',
+    background: 'rgba(239, 68, 68, 0.06)',
+  },
+  vencidoBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '2px 7px',
+    borderRadius: 999,
+    fontSize: 10,
+    fontWeight: 900,
+    letterSpacing: 0.5,
+    background: 'rgba(239, 68, 68, 0.15)',
+    border: '1px solid rgba(239, 68, 68, 0.35)',
+    color: '#dc2626',
+  },
   error: {
     marginTop: 12,
     padding: 10,
@@ -654,6 +746,19 @@ const styles = {
     fontWeight: 900,
     cursor: 'pointer',
   },
+  iconBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    padding: '7px 12px',
+    borderRadius: 10,
+    border: '1px solid rgba(11, 42, 82, 0.20)',
+    background: 'rgba(255,255,255,0.35)',
+    color: '#0b2a52',
+    fontWeight: 800,
+    fontSize: 12,
+    cursor: 'pointer',
+  },
   roleBadge: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -696,5 +801,44 @@ const styles = {
     color: '#7f1d1d',
     fontWeight: 900,
     cursor: 'pointer',
+  },
+  modalOverlay: {
+    position: 'fixed', inset: 0, zIndex: 1000,
+    background: 'rgba(11, 42, 82, 0.45)',
+    backdropFilter: 'blur(4px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: 16,
+  },
+  modalBox: {
+    background: 'rgba(245, 248, 255, 0.98)',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 440,
+    boxShadow: '0 32px 80px rgba(0,0,0,0.22)',
+    border: '1px solid rgba(255,255,255,0.7)',
+  },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 },
+  modalTitle: { fontWeight: 900, color: '#0b2a52', fontSize: 17 },
+  modalMeta: { marginTop: 4, fontSize: 12, fontWeight: 700, color: 'rgba(11,42,82,0.60)' },
+  modalClose: {
+    background: 'rgba(11,42,82,0.08)', border: 'none', borderRadius: 8,
+    width: 30, height: 30, cursor: 'pointer', fontWeight: 900,
+    color: 'rgba(11,42,82,0.70)', fontSize: 14, flexShrink: 0,
+  },
+  modalItems: { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 },
+  modalItem: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '10px 12px', borderRadius: 10,
+    background: 'rgba(11,42,82,0.05)', border: '1px solid rgba(11,42,82,0.08)',
+  },
+  modalItemName: { fontWeight: 800, color: '#0b2a52', fontSize: 13 },
+  modalItemSku: { fontWeight: 700, color: 'rgba(11,42,82,0.55)', fontSize: 11 },
+  modalItemPrice: { fontWeight: 900, color: '#0b2a52', fontSize: 13, flexShrink: 0 },
+  modalTotal: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '12px 12px', borderRadius: 12,
+    background: 'rgba(11,42,82,0.08)', border: '1px solid rgba(11,42,82,0.12)',
+    fontWeight: 900, color: '#0b2a52', fontSize: 15,
   },
 };

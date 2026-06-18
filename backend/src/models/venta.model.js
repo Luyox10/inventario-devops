@@ -125,6 +125,30 @@ async function listVentas({ from, to } = {}) {
   return rows;
 }
 
+async function getVentaDetalle(venta_id) {
+  const [header] = await pool.query(
+    `SELECT v.id, v.total, v.created_at,
+            u.nombre AS usuario_nombre, u.email AS usuario_email, u.rol AS usuario_rol
+     FROM ventas v
+     INNER JOIN usuarios u ON u.id = v.usuario_id
+     WHERE v.id = ?`,
+    [venta_id]
+  );
+  if (!header[0]) return null;
+
+  const [items] = await pool.query(
+    `SELECT dv.cantidad, dv.precio_unitario, dv.subtotal,
+            p.nombre AS producto_nombre, p.sku, p.unidad
+     FROM detalle_ventas dv
+     INNER JOIN productos p ON p.id = dv.producto_id
+     WHERE dv.venta_id = ?
+     ORDER BY dv.id ASC`,
+    [venta_id]
+  );
+
+  return { ...header[0], items };
+}
+
 module.exports = {
   createVenta,
   createDetalleVenta,
@@ -133,4 +157,5 @@ module.exports = {
   createMovimiento,
   allocateLotesForSale,
   listVentas,
+  getVentaDetalle,
 };
