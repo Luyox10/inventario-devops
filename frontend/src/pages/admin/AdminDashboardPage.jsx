@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 import { getDashboard } from '../../api/reportes';
 import { listStockBajo, listProductosVencidos } from '../../api/alertas';
@@ -12,44 +13,62 @@ function formatMoney(n) {
   return `S/ ${v.toFixed(2)}`;
 }
 
-function DonutSegments({ segments = [], size = 62, stroke = 10, track = 'rgba(11, 42, 82, 0.10)' }) {
+function DonutChart({ segments = [] }) {
   const safe = Array.isArray(segments) ? segments : [];
   const total = safe.reduce((acc, s) => acc + Number(s?.value || 0), 0);
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
+  const data = safe.map((s) => ({ name: s.key, value: Number(s.value || 0), color: s.color }));
 
-  let offset = 0;
+  const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+    if (percent < 0.05) return null;
+    const RADIAN = Math.PI / 180;
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    return (
+      <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={900}>
+        {`${Math.round(percent * 100)}%`}
+      </text>
+    );
+  };
+
+  if (total === 0) {
+    return (
+      <ResponsiveContainer width="100%" height={130}>
+        <PieChart>
+          <Pie data={[{ value: 1 }]} cx="50%" cy="50%" innerRadius={35} outerRadius={55} dataKey="value">
+            <Cell fill="rgba(11,42,82,0.10)" />
+          </Pie>
+        </PieChart>
+      </ResponsiveContainer>
+    );
+  }
 
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={styles.chartSvg}>
-      <circle cx={size / 2} cy={size / 2} r={r} stroke={track} strokeWidth={stroke} fill="none" />
-      {safe
-        .filter((s) => Number(s?.value || 0) > 0)
-        .map((s) => {
-          const v = Number(s.value || 0);
-          const frac = total > 0 ? v / total : 0;
-          const dash = c * frac;
-          const gap = c - dash;
-          const dashoffset = c * (offset / (total || 1));
-          offset += v;
-
-          return (
-            <circle
-              key={s.key}
-              cx={size / 2}
-              cy={size / 2}
-              r={r}
-              stroke={s.color}
-              strokeWidth={stroke}
-              fill="none"
-              strokeDasharray={`${dash} ${gap}`}
-              strokeDashoffset={-dashoffset}
-              strokeLinecap="round"
-              transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            />
-          );
-        })}
-    </svg>
+    <ResponsiveContainer width="100%" height={130}>
+      <PieChart>
+        <Pie
+          data={data}
+          cx="50%"
+          cy="50%"
+          innerRadius={35}
+          outerRadius={55}
+          dataKey="value"
+          labelLine={false}
+          label={renderLabel}
+          strokeWidth={2}
+          stroke="rgba(255,255,255,0.6)"
+        >
+          {data.map((entry, i) => (
+            <Cell key={i} fill={entry.color} />
+          ))}
+        </Pie>
+        <Tooltip
+          formatter={(v, name) => [v, name]}
+          contentStyle={{ background: 'rgba(11,42,82,0.92)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 12 }}
+          itemStyle={{ color: '#fff' }}
+        />
+      </PieChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -81,82 +100,29 @@ function formatShortDayLabel(iso) {
   return `${names[d.getDay()]} ${pad2(d.getDate())}`;
 }
 
-function Sparkline({ data = [], labels = [], width = 180, height = 44, stroke = '#0b2a52' }) {
-  const values = Array.isArray(data) ? data.map((n) => Number(n || 0)) : [];
-  const [hoverIdx, setHoverIdx] = useState(-1);
-  const max = Math.max(1, ...values);
-  const min = Math.min(0, ...values);
-  const range = Math.max(1e-9, max - min);
-  const step = values.length > 1 ? width / (values.length - 1) : width;
-
-  const pointsArr = values.map((v, i) => {
-    const x = i * step;
-    const y = height - ((v - min) / range) * height;
-    return { x, y, v };
-  });
-
-  const points = pointsArr.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-
-  function onMove(e) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const raw = step > 0 ? Math.round(x / step) : 0;
-    const idx = Math.max(0, Math.min(values.length - 1, raw));
-    setHoverIdx(idx);
-  }
-
-  function onLeave() {
-    setHoverIdx(-1);
-  }
-
-  const hp = hoverIdx >= 0 ? pointsArr[hoverIdx] : null;
-  const hLabel = hoverIdx >= 0 ? String(labels?.[hoverIdx] || '') : '';
-
+function VentasChart({ data = [], labels = [], color = '#6366f1' }) {
+  const chartData = labels.map((label, i) => ({ label, value: Number(data[i] || 0) }));
   return (
-    <div style={{ position: 'relative', width, maxWidth: '100%' }}>
-      <svg
-        width={width}
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
-        style={styles.chartSvg}
-        onMouseMove={onMove}
-        onMouseLeave={onLeave}
-      >
-        <line x1="0" y1={height - 0.5} x2={width} y2={height - 0.5} stroke="rgba(11, 42, 82, 0.10)" strokeWidth="1" />
-        <line x1="0" y1={height * 0.5} x2={width} y2={height * 0.5} stroke="rgba(11, 42, 82, 0.06)" strokeWidth="1" />
-        <line x1="0" y1="0.5" x2={width} y2="0.5" stroke="rgba(11, 42, 82, 0.06)" strokeWidth="1" />
-
-        <polyline fill="none" stroke={stroke} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" points={points} />
-
-        {hp ? (
-          <>
-            <circle cx={hp.x} cy={hp.y} r="4.5" fill={stroke} />
-            <circle cx={hp.x} cy={hp.y} r="8" fill={stroke} opacity="0.18" />
-          </>
-        ) : null}
-      </svg>
-
-      {hp ? (
-        <div
-          style={{
-            position: 'absolute',
-            left: Math.min(width - 10, Math.max(10, hp.x)) - 10,
-            top: Math.max(0, hp.y) - 36,
-            transform: 'translate(-50%, -50%)',
-            background: 'rgba(11, 42, 82, 0.92)',
-            color: 'rgba(255,255,255,0.95)',
-            padding: '6px 8px',
-            borderRadius: 10,
-            fontSize: 12,
-            fontWeight: 800,
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {hLabel ? `${hLabel}: ` : ''}{formatMoney(hp.v)}
-        </div>
-      ) : null}
-    </div>
+    <ResponsiveContainer width="100%" height={120}>
+      <AreaChart data={chartData} margin={{ top: 6, right: 4, left: 0, bottom: 0 }}>
+        <defs>
+          <linearGradient id="ventasGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor={color} stopOpacity={0.25} />
+            <stop offset="95%" stopColor={color} stopOpacity={0.02} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,42,82,0.08)" vertical={false} />
+        <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'rgba(11,42,82,0.45)', fontWeight: 700 }} axisLine={false} tickLine={false} />
+        <YAxis hide />
+        <Tooltip
+          formatter={(v) => [formatMoney(v), 'Ventas']}
+          contentStyle={{ background: 'rgba(11,42,82,0.92)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 12 }}
+          itemStyle={{ color: '#fff' }}
+          labelStyle={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}
+        />
+        <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2.5} fill="url(#ventasGrad)" dot={false} activeDot={{ r: 5, fill: color }} />
+      </AreaChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -219,6 +185,7 @@ export default function AdminDashboardPage() {
     setLoading(true);
     try {
       const today = new Date();
+      today.setHours(0, 0, 0, 0);
       const from7 = new Date(today);
       from7.setDate(today.getDate() - 6);
 
@@ -235,8 +202,18 @@ export default function AdminDashboardPage() {
       const ventasRows = Array.isArray(resVentas) ? resVentas : [];
       const byDay = new Map();
       for (const v of ventasRows) {
-        const key = String(v?.created_at || '').slice(0, 10);
-        if (!key) continue;
+        const raw = v?.created_at;
+        if (!raw) continue;
+        // mysql2 puede devolver un objeto Date o un string ISO; normalizamos a YYYY-MM-DD
+        let key;
+        if (raw instanceof Date) {
+          key = isoDate(raw);
+        } else {
+          // Convertir a Date local para que coincida con la zona del navegador
+          const d = new Date(String(raw).replace(' ', 'T').replace(/(\.\d+)?$/, ''));
+          key = isNaN(d.getTime()) ? String(raw).slice(0, 10) : isoDate(d);
+        }
+        if (!key || key.length !== 10) continue;
         byDay.set(key, (byDay.get(key) || 0) + Number(v?.total || 0));
       }
       const series = [];
@@ -266,10 +243,20 @@ export default function AdminDashboardPage() {
 
       setAlertas(Array.isArray(resAlertas) ? resAlertas : []);
 
-      setExpiryStats({
-        proximos: Number(resDashboard?.proximos_a_vencer || 0),
-        vencidos: Number(resDashboard?.vencidos || 0),
-      });
+      let proximos = 0;
+      let vencidos = 0;
+      for (const p of productos) {
+        if (!p?.expiry_date) continue;
+        const expiry = new Date(p.expiry_date);
+        expiry.setHours(0, 0, 0, 0);
+        if (expiry <= today) {
+          vencidos += 1;
+        } else {
+          const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+          if (diffDays <= 7) proximos += 1;
+        }
+      }
+      setExpiryStats({ proximos, vencidos });
 
       setProductosVencidos(Array.isArray(resVencidos) ? resVencidos : []);
     } catch (err) {
@@ -303,10 +290,11 @@ export default function AdminDashboardPage() {
     let bajo = 0;
     for (const a of rows) {
       const actual = Number(a?.stock_actual ?? a?.stock ?? 0);
-      if (actual <= 0) criticos += 1;
-      else bajo += 1;
+      const minimo = Number(a?.stock_minimo ?? 0);
+      if (actual === 0) criticos += 1;
+      else if (actual > 0 && actual <= minimo) bajo += 1;
     }
-    return { criticos, bajo, total: rows.length };
+    return { criticos, bajo, total: criticos + bajo };
   }, [alertas]);
 
   const productosPct = useMemo(() => {
@@ -333,108 +321,122 @@ export default function AdminDashboardPage() {
 
       {error ? <div style={styles.error}>{error}</div> : null}
 
-      {productosVencidos.length > 0 ? (
-        <div style={styles.alertaVencidos}>
-          <div style={{ fontWeight: 900, color: '#dc2626', marginBottom: 8 }}>
-            ⚠️ {productosVencidos.length} producto(s) vencido(s)
-          </div>
-          {productosVencidos.slice(0, 3).map((p) => (
-            <div key={p.id} style={{ fontSize: 13, color: 'rgba(11, 42, 82, 0.85)', marginBottom: 6 }}>
-              <strong>{p.nombre}</strong> (SKU: {p.sku}) - Vencido desde {p.expiry_date}
-            </div>
-          ))}
-          {productosVencidos.length > 3 ? (
-            <div style={{ fontSize: 12, color: 'rgba(11, 42, 82, 0.65)', marginTop: 8 }}>
-              + {productosVencidos.length - 3} producto(s) más vencido(s)
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
       <div style={styles.kpis}>
+        {/* Ventas hoy */}
         <Link to="/admin/ventas" style={styles.kpiCard}>
-          <div style={styles.kpiLabel}>Ventas hoy</div>
-          <div style={styles.kpiValue}>{loading ? '...' : formatMoney(data?.total_ventas_hoy)}</div>
-          <div style={styles.kpiChartBelow}>
+          <div style={styles.kpiCardTop}>
+            <div style={{ ...styles.kpiIcon, background: 'rgba(99, 102, 241, 0.12)' }}>
+              <span style={{ fontSize: 20 }}>💰</span>
+            </div>
+            <div>
+              <div style={styles.kpiLabel}>Ventas hoy</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={styles.kpiValue}>{loading ? '...' : formatMoney(data?.total_ventas_hoy)}</div>
+                {!loading && (
+                  <span style={{
+                    fontSize: 12, fontWeight: 900,
+                    color: ventasTrend >= 0 ? 'rgba(34,197,94,0.95)' : 'rgba(239,68,68,0.92)',
+                  }}>
+                    {ventasTrend >= 0 ? '▲' : '▼'} {Math.abs(ventasTrend) > 0 ? formatMoney(Math.abs(ventasTrend)) : ''}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div style={{ marginTop: 12 }}>
             {loading ? null : ventasAllZero ? (
               <div style={styles.muted}>Sin ventas en los últimos 7 días</div>
             ) : (
-              <Sparkline
+              <VentasChart
                 data={ventas7d}
                 labels={ventas7dLabels}
-                width={240}
-                stroke={ventasTrend >= 0 ? 'rgba(34, 197, 94, 0.95)' : 'rgba(239, 68, 68, 0.92)'}
+                color={ventasTrend >= 0 ? '#6366f1' : '#ef4444'}
               />
             )}
           </div>
-          <div style={styles.kpiHint}>Últimos 7 días</div>
         </Link>
 
+        {/* Productos disponibles */}
         <Link to="/admin/productos" style={styles.kpiCard}>
-          <div style={styles.kpiLabel}>Productos disponibles</div>
-          <div style={styles.kpiValue}>{loading ? '...' : Number(data?.productos_activos || 0)}</div>
-          <div style={styles.kpiChartBelow}>
+          <div style={styles.kpiCardTop}>
+            <div style={{ ...styles.kpiIcon, background: 'rgba(16, 185, 129, 0.12)' }}>
+              <span style={{ fontSize: 20 }}>📦</span>
+            </div>
+            <div>
+              <div style={styles.kpiLabel}>Productos disponibles</div>
+              <div style={styles.kpiValue}>
+                {loading ? '...' : `${Number(data?.productos_activos || 0)} productos`}
+              </div>
+            </div>
+          </div>
+          <div style={styles.kpiChartCenter}>
             {loading ? null : (
-              <StackedBar
-                parts={[
-                  { key: 'ok', value: productosStats.ok, color: 'rgba(34, 197, 94, 0.75)' },
-                  { key: 'bajo', value: productosStats.bajo, color: 'rgba(245, 158, 11, 0.75)' },
-                  { key: 'sin', value: productosStats.sinStock, color: 'rgba(239, 68, 68, 0.70)' },
+              <DonutChart
+                segments={[
+                  { key: 'OK', value: productosStats.ok, color: '#10b981' },
+                  { key: 'Bajo', value: productosStats.bajo, color: '#f59e0b' },
+                  { key: 'Sin stock', value: productosStats.sinStock, color: '#ef4444' },
                 ]}
               />
             )}
           </div>
-          <div style={{ ...styles.kpiHint, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-            <span style={{ ...styles.badge, background: 'rgba(34, 197, 94, 0.14)', border: '1px solid rgba(34, 197, 94, 0.28)' }}>
+          <div style={styles.kpiLegend}>
+            <div style={styles.legendItem}>
+              <span style={{ ...styles.legendDot, background: 'rgba(34, 197, 94, 0.92)' }} />
               OK: {loading ? '...' : productosStats.ok} ({loading ? '...' : productosPct.ok}%)
-            </span>
-            <span style={{ ...styles.badge, background: 'rgba(245, 158, 11, 0.14)', border: '1px solid rgba(245, 158, 11, 0.28)' }}>
+            </div>
+            <div style={styles.legendItem}>
+              <span style={{ ...styles.legendDot, background: 'rgba(245, 158, 11, 0.92)' }} />
               Bajo: {loading ? '...' : productosStats.bajo} ({loading ? '...' : productosPct.bajo}%)
-            </span>
-            <span style={{ ...styles.badge, background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.26)' }}>
+            </div>
+            <div style={styles.legendItem}>
+              <span style={{ ...styles.legendDot, background: 'rgba(239, 68, 68, 0.92)' }} />
               Sin stock: {loading ? '...' : productosStats.sinStock} ({loading ? '...' : productosPct.sin}%)
-            </span>
+            </div>
           </div>
         </Link>
 
-        <Link to="/admin/alertas" style={styles.kpiCardWarn}>
-          <div style={styles.kpiLabel}>Alertas de stock bajo</div>
-          <div style={styles.kpiValue}>{loading ? '...' : Number(data?.stock_bajo || 0)}</div>
-          <div style={styles.kpiChartBelow}>
+        {/* Vencimientos */}
+        <div style={styles.kpiCard}>
+          <div style={styles.kpiCardTop}>
+            <div style={{ ...styles.kpiIcon, background: 'rgba(239, 68, 68, 0.10)' }}>
+              <span style={{ fontSize: 20 }}>📅</span>
+            </div>
+            <div>
+              <div style={styles.kpiLabel}>Vencimientos</div>
+              <div style={styles.kpiValue}>
+                {loading ? '...' : `${expiryStats.proximos + expiryStats.vencidos} productos`}
+              </div>
+            </div>
+          </div>
+          <div style={styles.kpiChartCenter}>
             {loading ? null : (
-              <DonutSegments
+              <DonutChart
                 segments={[
-                  { key: 'crit', value: alertasCounts.criticos, color: 'rgba(239, 68, 68, 0.92)' },
-                  { key: 'bajo', value: alertasCounts.bajo, color: 'rgba(245, 158, 11, 0.95)' },
+                  { key: 'Vencidos', value: expiryStats.vencidos, color: '#ef4444' },
+                  { key: 'Próximos', value: expiryStats.proximos, color: '#f59e0b' },
                 ]}
               />
             )}
           </div>
-          <div style={styles.kpiHint}>
-            {loading
-              ? '...'
-              : alertas.length === 0
-                ? 'Sin alertas'
-                : `Críticos: ${alertasCounts.criticos} | Bajo: ${alertasCounts.bajo}`}
-          </div>
-          {loading ? null : <div style={styles.cta}>Ver alertas</div>}
-        </Link>
-
-        <div style={styles.kpiCardExpiry}>
-          <div style={styles.kpiLabel}>Próximos a vencer</div>
-          <div style={styles.kpiValue}>{loading ? '...' : expiryStats.proximos}</div>
-          <div style={styles.kpiChartBelow}>
-            {loading ? null : (
-              <DonutSegments
-                segments={[
-                  { key: 'pront', value: expiryStats.proximos, color: 'rgba(245, 158, 11, 0.92)' },
-                  { key: 'vencidos', value: expiryStats.vencidos, color: 'rgba(239, 68, 68, 0.92)' },
-                ]}
-              />
-            )}
-          </div>
-          <div style={styles.kpiHint}>
-            {loading ? '...' : expiryStats.vencidos > 0 ? `⚠️ ${expiryStats.vencidos} vencidos` : 'Sin expirados'}
+          <div style={styles.kpiLegend}>
+            {(() => {
+              const total = expiryStats.vencidos + expiryStats.proximos;
+              const pctV = total > 0 ? Math.round((expiryStats.vencidos / total) * 100) : 0;
+              const pctP = total > 0 ? Math.round((expiryStats.proximos / total) * 100) : 0;
+              return (
+                <>
+                  <div style={styles.legendItem}>
+                    <span style={{ ...styles.legendDot, background: 'rgba(239, 68, 68, 0.92)' }} />
+                    Vencidos: {loading ? '...' : expiryStats.vencidos} ({loading ? '...' : pctV}%)
+                  </div>
+                  <div style={styles.legendItem}>
+                    <span style={{ ...styles.legendDot, background: 'rgba(245, 158, 11, 0.92)' }} />
+                    Próximos: {loading ? '...' : expiryStats.proximos} ({loading ? '...' : pctP}%)
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -512,9 +514,23 @@ const styles = {
     boxShadow: '0 28px 60px rgba(0, 0, 0, 0.16)',
     backdropFilter: 'blur(14px)',
   },
+  kpiCardTop: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 },
+  kpiIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  kpiChartCenter: { display: 'flex', justifyContent: 'center', marginTop: 12, marginBottom: 4 },
+  kpiLegend: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 },
+  legendItem: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(11, 42, 82, 0.80)', fontWeight: 700 },
+  legendDot: { width: 10, height: 10, borderRadius: '50%', flexShrink: 0 },
   kpiChartBelow: { marginTop: 10 },
   kpiLabel: { fontWeight: 900, color: 'rgba(11, 42, 82, 0.70)', fontSize: 12, letterSpacing: 0.4 },
-  kpiValue: { marginTop: 8, fontWeight: 900, color: '#0b2a52', fontSize: 24 },
+  kpiValue: { marginTop: 4, fontWeight: 900, color: '#0b2a52', fontSize: 22 },
   kpiHint: { marginTop: 10, color: 'rgba(11, 42, 82, 0.70)', fontSize: 12, fontWeight: 800 },
   muted: { color: 'rgba(11, 42, 82, 0.55)', fontSize: 12, fontWeight: 800, paddingTop: 6 },
   chartSvg: { display: 'block' },

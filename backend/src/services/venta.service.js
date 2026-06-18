@@ -64,4 +64,11 @@ async function listVentas({ from, to }) {
   return ventaModel.listVentas({ from, to });
 }
 
-module.exports = { crearVenta, listVentas };
+async function getVentaDetalle(id) {
+  const { httpError } = require('../utils/httpError');
+  const data = await ventaModel.getVentaDetalle(id);
+  if (!data) throw httpError(404, 'Venta no encontrada');
+  return data;
+}
+
+module.exports = { crearVenta, listVentas, getVentaDetalle };

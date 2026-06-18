@@ -30,3 +30,7 @@ export function listVentas({ token, from, to } = {}) {
   const qs = params.toString();
   return apiFetch(`/api/ventas${qs ? `?${qs}` : ''}`, { token });
 }
+
+export function getVentaDetalle({ token, id }) {
+  return apiFetch(`/api/ventas/${id}`, { token });
+}

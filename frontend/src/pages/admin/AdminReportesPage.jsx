@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { ShoppingCart, Package } from 'lucide-react';
 
 import { getDashboard } from '../../api/reportes';
 import { listVentas } from '../../api/ventas';
@@ -67,7 +68,6 @@ export default function AdminReportesPage() {
     try {
       const res = await listVentas({ token, from: fromDate || undefined, to: toDate || undefined });
       const rows = Array.isArray(res) ? res : [];
-
       const total = rows.reduce((acc, v) => acc + Number(v?.total || 0), 0);
       setVentas(rows);
       setVentasResumen({ total, cantidad: rows.length });
@@ -124,25 +124,30 @@ export default function AdminReportesPage() {
         ) : (
           <div style={styles.kpis}>
             <div style={{ ...styles.kpi, ...styles.kpiPrimary }}>
-              <div style={{ ...styles.kpiLabel, ...styles.kpiOnDark }}>Ventas hoy</div>
+              <div style={styles.kpiTop}>
+                <div style={{ ...styles.kpiIconBox, background: 'rgba(255,255,255,0.12)' }}>
+                  <ShoppingCart size={18} color="rgba(255,255,255,0.9)" strokeWidth={2.5} />
+                </div>
+                <div style={{ ...styles.kpiLabel, ...styles.kpiOnDark }}>Ventas hoy</div>
+              </div>
               <div style={{ ...styles.kpiValue, ...styles.kpiValueOnDark }}>{formatMoney(data.total_ventas_hoy)}</div>
               <div style={{ ...styles.kpiSub, ...styles.kpiOnDarkMuted }}>Total vendido en el día</div>
             </div>
             <div style={styles.kpi}>
-              <div style={styles.kpiLabel}>Productos activos</div>
+              <div style={styles.kpiTop}>
+                <div style={{ ...styles.kpiIconBox, background: 'rgba(16,185,129,0.12)' }}>
+                  <Package size={18} color="#059669" strokeWidth={2.5} />
+                </div>
+                <div style={styles.kpiLabel}>Productos activos</div>
+              </div>
               <div style={styles.kpiValue}>{Number(data.productos_activos || 0)}</div>
               <div style={styles.kpiSub}>Disponibles en catálogo</div>
-            </div>
-            <div style={{ ...styles.kpi, ...styles.kpiWarn }}>
-              <div style={styles.kpiLabel}>Alertas de stock bajo</div>
-              <div style={styles.kpiValue}>{Number(data.stock_bajo || 0)}</div>
-              <div style={styles.kpiSub}>Productos bajo mínimo</div>
             </div>
           </div>
         )}
       </section>
 
-      <section style={styles.card}>
+      <section style={{ ...styles.card, marginTop: 16 }}>
         <div style={styles.sectionHead}>
           <div>
             <div style={styles.sectionTitle}>Ventas</div>
@@ -273,6 +278,7 @@ export default function AdminReportesPage() {
           ) : null}
         </div>
       </section>
+
     </div>
   );
 }
@@ -319,6 +325,11 @@ const styles = {
     gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: 12,
     marginTop: 8,
+  },
+  kpiTop: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 },
+  kpiIconBox: {
+    width: 34, height: 34, borderRadius: 10,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   kpi: {
     padding: 14,
@@ -487,5 +498,46 @@ const styles = {
     color: '#0b2a52',
     fontWeight: 900,
     cursor: 'pointer',
+  },
+  iconBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    padding: '6px 11px', borderRadius: 10,
+    border: '1px solid rgba(11,42,82,0.20)',
+    background: 'rgba(255,255,255,0.35)',
+    color: '#0b2a52', fontWeight: 800, fontSize: 12, cursor: 'pointer',
+  },
+  modalOverlay: {
+    position: 'fixed', inset: 0, zIndex: 1000,
+    background: 'rgba(11,42,82,0.45)', backdropFilter: 'blur(4px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+  },
+  modalBox: {
+    background: 'rgba(245,248,255,0.98)', borderRadius: 20, padding: 24,
+    width: '100%', maxWidth: 440,
+    boxShadow: '0 32px 80px rgba(0,0,0,0.22)',
+    border: '1px solid rgba(255,255,255,0.7)',
+  },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 },
+  modalTitle: { fontWeight: 900, color: '#0b2a52', fontSize: 17 },
+  modalMeta: { marginTop: 4, fontSize: 12, fontWeight: 700, color: 'rgba(11,42,82,0.60)' },
+  modalClose: {
+    background: 'rgba(11,42,82,0.08)', border: 'none', borderRadius: 8,
+    width: 30, height: 30, cursor: 'pointer', fontWeight: 900,
+    color: 'rgba(11,42,82,0.70)', fontSize: 14, flexShrink: 0,
+  },
+  modalItems: { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 },
+  modalItem: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '10px 12px', borderRadius: 10,
+    background: 'rgba(11,42,82,0.05)', border: '1px solid rgba(11,42,82,0.08)',
+  },
+  modalItemName: { fontWeight: 800, color: '#0b2a52', fontSize: 13 },
+  modalItemSku: { fontWeight: 700, color: 'rgba(11,42,82,0.55)', fontSize: 11 },
+  modalItemPrice: { fontWeight: 900, color: '#0b2a52', fontSize: 13, flexShrink: 0 },
+  modalTotal: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    padding: '12px 12px', borderRadius: 12,
+    background: 'rgba(11,42,82,0.08)', border: '1px solid rgba(11,42,82,0.12)',
+    fontWeight: 900, color: '#0b2a52', fontSize: 15,
   },
 };
