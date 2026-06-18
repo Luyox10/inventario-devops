@@ -41,8 +41,23 @@ services:
       JWT_SECRET: change_this_secret
       JWT_EXPIRES_IN: 1d
       BOOTSTRAP_SECRET: change_this_bootstrap_secret
+      ML_SERVICE_URL: http://ml-service:5001
     ports:
       - '3001:3001'
+    depends_on:
+      mysql:
+        condition: service_healthy
+      ml-service:
+        condition: service_started
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: inventario-ml
+    restart: unless-stopped
+    ports:
+      - '5001:5001'
 
   frontend:
     build:

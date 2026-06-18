@@ -14,6 +14,7 @@ const alertaRoutes = require('./routes/alerta.routes');
 const reporteRoutes = require('./routes/reporte.routes');
 const usuarioRoutes = require('./routes/usuario.routes');
 const loteRoutes = require('./routes/lote.routes');
+const prediccionRoutes = require('./routes/prediccion.routes');
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use('/api/alertas', alertaRoutes);
 app.use('/api/reportes', reporteRoutes);
 app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/lotes', loteRoutes);
+app.use('/api/predicciones', prediccionRoutes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
