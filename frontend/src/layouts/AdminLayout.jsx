@@ -11,7 +11,8 @@ const navItems = [
   { to: '/admin/alertas', label: 'Alertas', enabled: true },
   { to: '/admin/reportes', label: 'Reportes', enabled: true },
   { to: '/admin/usuarios', label: 'Usuarios', enabled: true },
-  { to: '/admin/predicciones', label: 'Predicciones', enabled: true },
+  { to: '/admin/kardex', label: 'Kardex', enabled: true },
+  { to: '/admin/predicciones', label: 'Predicciones ML', enabled: true },
 ];
 
 export default function AdminLayout() {
