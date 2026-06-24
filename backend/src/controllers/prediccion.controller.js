@@ -1,4 +1,4 @@
-const { trainModelo, getPredictiones, getMLHealth } = require('../services/prediccion.service');
+const { trainModelo, simulateAndTrain, getPredictiones, getMLHealth, getMetrics } = require('../services/prediccion.service');
 
 async function health(req, res, next) {
   try {
@@ -14,6 +14,19 @@ async function train(req, res, next) {
     const result = await trainModelo();
     res.json(result);
   } catch (err) {
+    next(err);
+  }
+}
+
+async function simulate(req, res, next) {
+  try {
+    const dias = Number(req.query.dias) || 90;
+    const result = await simulateAndTrain({ dias });
+    res.json(result);
+  } catch (err) {
+    if (err.status === 400) {
+      return res.status(400).json({ error: err.message });
+    }
     next(err);
   }
 }
@@ -34,4 +47,16 @@ async function predict(req, res, next) {
   }
 }
 
-module.exports = { health, train, predict };
+async function metrics(req, res, next) {
+  try {
+    const result = await getMetrics();
+    res.json(result);
+  } catch (err) {
+    if (err.status === 503) {
+      return res.status(503).json({ modelo_listo: false, error: err.message });
+    }
+    next(err);
+  }
+}
+
+module.exports = { health, train, simulate, predict, metrics };
