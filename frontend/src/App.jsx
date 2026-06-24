@@ -10,6 +10,7 @@ import AdminAlertasPage from './pages/admin/AdminAlertasPage.jsx';
 import AdminReportesPage from './pages/admin/AdminReportesPage.jsx';
 import AdminUsuariosPage from './pages/admin/AdminUsuariosPage.jsx';
 import AdminPrediccionesPage from './pages/admin/AdminPrediccionesPage.jsx';
+import AdminKardexPage from './pages/admin/AdminKardexPage.jsx';
 import EmpleadoDashboardPage from './pages/empleado/EmpleadoDashboardPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import RequireAuth from './routes/RequireAuth.jsx';
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="reportes" element={<AdminReportesPage />} />
         <Route path="usuarios" element={<AdminUsuariosPage />} />
         <Route path="predicciones" element={<AdminPrediccionesPage />} />
+        <Route path="kardex" element={<AdminKardexPage />} />
       </Route>
 
       {/* RUTAS DE EMPLEADO (Refactorizadas) */}
