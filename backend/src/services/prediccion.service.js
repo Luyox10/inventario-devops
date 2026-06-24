@@ -2,13 +2,16 @@ const { pool } = require('../config/db');
 
 const ML_URL = process.env.ML_SERVICE_URL || 'http://localhost:5001';
 
-async function fetchML(path, body) {
-  const res = await fetch(`${ML_URL}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30000),
-  });
+async function fetchML(path, body, method = 'POST') {
+  const options = {
+    method,
+    signal: AbortSignal.timeout(60000),
+  };
+  if (body !== undefined) {
+    options.headers = { 'Content-Type': 'application/json' };
+    options.body = JSON.stringify(body);
+  }
+  const res = await fetch(`${ML_URL}${path}`, options);
   const json = await res.json();
   if (!res.ok) throw Object.assign(new Error(json.error || 'ML service error'), { status: res.status });
   return json;
@@ -57,6 +60,23 @@ async function trainModelo() {
   return fetchML('/train', { ventas });
 }
 
+async function simulateAndTrain({ dias = 90 } = {}) {
+  const productos = await getProductosActivos();
+  if (!productos.length) {
+    throw Object.assign(new Error('No hay productos activos para simular datos.'), { status: 400 });
+  }
+  const simResult = await fetchML('/simulate', { productos, dias });
+  const trainResult = await fetchML('/train', { ventas: simResult.ventas });
+  return {
+    simulacion: {
+      registros: simResult.total_registros,
+      productos: simResult.productos,
+      dias: simResult.dias,
+    },
+    entrenamiento: trainResult,
+  };
+}
+
 async function getPredictiones({ dias = 7 } = {}) {
   const productos = await getProductosActivos();
   return fetchML('/predict', { productos, dias });
@@ -69,4 +89,8 @@ async function getMLHealth() {
   return res.json();
 }
 
-module.exports = { trainModelo, getPredictiones, getMLHealth };
+async function getMetrics() {
+  return fetchML('/metrics', undefined, 'GET');
+}
+
+module.exports = { trainModelo, simulateAndTrain, getPredictiones, getMLHealth, getMetrics };
