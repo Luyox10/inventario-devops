@@ -5,7 +5,7 @@ const ML_URL = process.env.ML_SERVICE_URL || 'http://localhost:5001';
 async function fetchML(path, body, method = 'POST') {
   const options = {
     method,
-    signal: AbortSignal.timeout(60000),
+    signal: AbortSignal.timeout(120000),
   };
   if (body !== undefined) {
     options.headers = { 'Content-Type': 'application/json' };
