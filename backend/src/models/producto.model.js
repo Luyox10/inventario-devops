@@ -46,6 +46,7 @@ function normalizeCreateProductoInput(data) {
   return {
     nombre,
     sku: toNullableTrimmedString(data?.sku),
+    categoria: toRequiredTrimmedString(data?.categoria, 'Sin categoria'),
     unidad: toRequiredTrimmedString(data?.unidad, 'und'),
     descripcion: toNullableTrimmedString(data?.descripcion),
     expiry_date: parseDateOnly(data?.expiry_date),
@@ -60,6 +61,7 @@ async function listProductos({ includeInactive = false } = {}) {
   const [rows] = await pool.query(
     `SELECT p.id,
             p.nombre,
+            COALESCE(p.categoria, 'Sin categoria') AS categoria,
             p.sku,
             p.unidad,
             p.descripcion,
@@ -88,6 +90,7 @@ async function getProductoById(id) {
   const [rows] = await pool.query(
     `SELECT p.id,
             p.nombre,
+            COALESCE(p.categoria, 'Sin categoria') AS categoria,
             p.sku,
             p.unidad,
             p.descripcion,
@@ -132,10 +135,11 @@ async function createProducto(data) {
   let result;
   try {
     [result] = await pool.query(
-      `INSERT INTO productos (nombre, sku, unidad, descripcion, expiry_date, precio, stock_actual, stock_minimo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO productos (nombre, categoria, sku, unidad, descripcion, expiry_date, precio, stock_actual, stock_minimo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         payload.nombre,
+        payload.categoria,
         payload.sku,
         payload.unidad,
         payload.descripcion,
@@ -168,13 +172,14 @@ async function createProducto(data) {
   };
 }
 
-async function updateProducto(id, { nombre, sku, unidad, descripcion, precio, stock_actual, stock_minimo, activo, expiry_date }) {
+async function updateProducto(id, { nombre, sku, categoria, unidad, descripcion, precio, stock_actual, stock_minimo, activo, expiry_date }) {
   const existing = await getProductoById(id);
   if (!existing) return null;
 
   const next = {
     nombre: nombre ?? existing.nombre,
     sku: sku ?? existing.sku,
+    categoria: categoria ?? existing.categoria ?? 'Sin categoria',
     unidad: unidad ?? existing.unidad,
     descripcion: descripcion ?? existing.descripcion,
     precio: precio ?? existing.precio,
@@ -186,10 +191,11 @@ async function updateProducto(id, { nombre, sku, unidad, descripcion, precio, st
 
   await pool.query(
     `UPDATE productos
-     SET nombre = ?, sku = ?, unidad = ?, descripcion = ?, expiry_date = ?, precio = ?, stock_actual = ?, stock_minimo = ?, activo = ?
+     SET nombre = ?, categoria = ?, sku = ?, unidad = ?, descripcion = ?, expiry_date = ?, precio = ?, stock_actual = ?, stock_minimo = ?, activo = ?
      WHERE id = ?`,
     [
       next.nombre,
+      next.categoria,
       next.sku,
       next.unidad,
       next.descripcion,
