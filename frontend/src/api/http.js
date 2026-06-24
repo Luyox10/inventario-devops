@@ -13,6 +13,7 @@ export async function apiFetch(path, { method = 'GET', token, body } = {}) {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(120000),
   });
 
   let data = null;
