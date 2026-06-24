@@ -4,10 +4,13 @@ import { createProducto, deleteProducto, listProductos, updateProducto } from '.
 import { getLotesByProducto, updateLoteExpiry, darDeBajaLote } from '../../api/lotes';
 import { useAuth } from '../../state/auth/AuthContext.jsx';
 
+const CATEGORIAS = ['Sin categoría', 'Bebidas', 'Snacks', 'Lacteos', 'Abarrotes', 'Limpieza', 'Otros'];
+
 function emptyForm() {
   return {
     nombre: '',
     sku: '',
+    categoria: 'Sin categoría',
     unidad: 'und',
     descripcion: '',
     expiry_date: '',
@@ -386,6 +389,13 @@ export default function AdminProductosPage() {
 
             <div style={styles.row2}>
               <label style={styles.label}>
+                Categoría
+                <select value={form.categoria} onChange={(e) => onChange('categoria', e.target.value)} style={styles.select}>
+                  {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </label>
+
+              <label style={styles.label}>
                 Unidad
                 <select value={form.unidad} onChange={(e) => onChange('unidad', e.target.value)} style={styles.select}>
                   <option value="und">Unidades</option>
@@ -396,8 +406,6 @@ export default function AdminProductosPage() {
                   <option value="m">Metros</option>
                 </select>
               </label>
-
-              <div />
             </div>
 
             <label style={styles.label}>
@@ -712,6 +720,13 @@ export default function AdminProductosPage() {
 
               <div style={styles.row2}>
                 <label style={styles.label}>
+                  Categoría
+                  <select value={editForm.categoria} onChange={(e) => onEditChange('categoria', e.target.value)} style={styles.select}>
+                    {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </label>
+
+                <label style={styles.label}>
                   Unidad
                   <select value={editForm.unidad} onChange={(e) => onEditChange('unidad', e.target.value)} style={styles.select}>
                     <option value="und">Unidades</option>
@@ -722,8 +737,6 @@ export default function AdminProductosPage() {
                     <option value="m">Metros</option>
                   </select>
                 </label>
-
-                <div />
               </div>
 
               <label style={styles.label}>
