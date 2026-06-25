@@ -4,13 +4,12 @@ import {
   ResponsiveContainer, Legend,
 } from 'recharts';
 import {
-  BrainCircuit, RefreshCw, Cpu, AlertTriangle, FlaskConical,
-  TrendingUp, Package, ShoppingCart, CheckCircle2, ArrowUp, BarChart2,
-  ChevronDown, ChevronUp, Info, Zap, Target, Activity,
+  BrainCircuit, RefreshCw, AlertTriangle,
+  TrendingUp, Package, ShoppingCart, CheckCircle2, ArrowUp,
 } from 'lucide-react';
 import { useAuth } from '../../state/auth/AuthContext.jsx';
 import {
-  getMLHealth, trainModelo, simulateAndTrain, getPredictiones, getMetrics,
+  getMLHealth, getPredictiones,
 } from '../../api/predicciones.js';
 
 const DIAS_OPTS = [7, 14, 30];
@@ -19,25 +18,6 @@ function formatNum(n, dec = 1) {
   return Number(n ?? 0).toLocaleString('es-PE', { maximumFractionDigits: dec });
 }
 
-function MetricCard({ label, value, desc, color, icon: Icon }) {
-  const isNull = value === null || value === undefined;
-  return (
-    <div style={{
-      flex: 1, minWidth: 120, padding: '14px 16px', borderRadius: 14,
-      background: 'rgba(255,255,255,0.50)', border: '1px solid rgba(255,255,255,0.60)',
-      boxShadow: '0 4px 14px rgba(0,0,0,0.05)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-        {Icon && <Icon size={14} color={color} />}
-        <span style={{ fontSize: 11, fontWeight: 900, color: 'rgba(11,42,82,0.50)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</span>
-      </div>
-      <div style={{ fontSize: 22, fontWeight: 900, color: isNull ? 'rgba(11,42,82,0.30)' : color, lineHeight: 1 }}>
-        {isNull ? '—' : formatNum(value, 4)}
-      </div>
-      <div style={{ fontSize: 11, color: 'rgba(11,42,82,0.45)', marginTop: 4, fontWeight: 700 }}>{desc}</div>
-    </div>
-  );
-}
 
 export default function AdminPrediccionesPage() {
   const { token } = useAuth();
@@ -46,13 +26,9 @@ export default function AdminPrediccionesPage() {
   const [result, setResult]             = useState(null);
   const [dias, setDias]                 = useState(7);
   const [loading, setLoading]           = useState(false);
-  const [training, setTraining]         = useState(false);
-  const [simulating, setSimulating]     = useState(false);
   const [error, setError]               = useState(null);
-  const [successMsg, setSuccessMsg]     = useState(null);
   const [selectedProd, setSelectedProd] = useState(null);
   const [catFilter, setCatFilter]       = useState('Todos');
-  const [showMetrics, setShowMetrics]   = useState(true);
   const [tab, setTab]                   = useState('tabla');
 
   const checkHealth = useCallback(async () => {
@@ -66,36 +42,8 @@ export default function AdminPrediccionesPage() {
     }
   }, [token]);
 
-  async function handleTrain() {
-    setTraining(true); setError(null); setSuccessMsg(null);
-    try {
-      const res = await trainModelo({ token });
-      setSuccessMsg(`Modelo entrenado con ${res.registros} registros reales.`);
-      await checkHealth();
-    } catch (err) {
-      setError(err.message || 'Error al entrenar el modelo.');
-    } finally {
-      setTraining(false);
-    }
-  }
-
-  async function handleSimulate() {
-    setSimulating(true); setError(null); setSuccessMsg(null);
-    try {
-      const res = await simulateAndTrain({ token, dias: 90 });
-      setSuccessMsg(
-        `Simulación completada: ${res.simulacion.registros} registros generados para ${res.simulacion.productos} productos (${res.simulacion.dias} días). Modelo entrenado.`
-      );
-      await checkHealth();
-    } catch (err) {
-      setError(err.message || 'Error al simular datos.');
-    } finally {
-      setSimulating(false);
-    }
-  }
-
   async function handlePredict() {
-    setLoading(true); setError(null); setSuccessMsg(null);
+    setLoading(true); setError(null);
     try {
       const data = await getPredictiones({ token, dias });
       setResult(data);
@@ -103,7 +51,7 @@ export default function AdminPrediccionesPage() {
       setSelectedProd(data?.resultados?.[0] ?? null);
     } catch (err) {
       if (err.status === 503) {
-        setError('El modelo aún no está entrenado. Usa "Entrenar modelo" o "Simular datos" primero.');
+        setError('El modelo aún no está listo. El sistema se entrena automáticamente con el historial de ventas. Intenta más tarde.');
       } else {
         setError(err.message || 'Error al generar predicciones.');
       }
@@ -115,7 +63,6 @@ export default function AdminPrediccionesPage() {
   useEffect(() => { checkHealth(); }, [checkHealth]);
 
   const modeloListo = mlStatus?.modelo_entrenado === true;
-  const metricas = result?.metricas ?? mlStatus?.metricas ?? null;
 
   const categorias = useMemo(() => {
     if (!result?.resultados) return [];
@@ -191,87 +138,6 @@ export default function AdminPrediccionesPage() {
           <AlertTriangle size={16} />{error}
         </div>
       )}
-      {successMsg && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderRadius: 12, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.22)', color: '#065f46', fontSize: 13, fontWeight: 700 }}>
-          <CheckCircle2 size={16} />{successMsg}
-        </div>
-      )}
-
-      {/* ── Panel de Entrenamiento ── */}
-      <div style={{ background: 'rgba(255,255,255,0.45)', borderRadius: 18, border: '1px solid rgba(255,255,255,0.60)', padding: '20px 22px', boxShadow: '0 6px 24px rgba(0,0,0,0.06)' }}>
-        <div style={{ fontWeight: 900, color: '#0b2a52', fontSize: 15, marginBottom: 4 }}>Entrenamiento del Modelo</div>
-        <div style={{ fontSize: 13, color: 'rgba(11,42,82,0.55)', marginBottom: 16, lineHeight: 1.6 }}>
-          Entrena el modelo con el historial real de ventas o genera datos simulados si la bodega aún no tiene registros suficientes.
-        </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={handleTrain} disabled={training || simulating}
-            style={{ ...s.btn, background: 'rgba(11,42,82,0.88)', color: '#fff', borderColor: 'transparent' }}>
-            <Cpu size={14} style={{ animation: training ? 'spin 1s linear infinite' : 'none' }} />
-            {training ? 'Entrenando...' : 'Entrenar con datos reales'}
-          </button>
-          <button onClick={handleSimulate} disabled={training || simulating}
-            style={{ ...s.btn, background: 'rgba(99,102,241,0.15)', color: '#4338ca', borderColor: 'rgba(99,102,241,0.30)' }}>
-            <FlaskConical size={14} style={{ animation: simulating ? 'spin 1s linear infinite' : 'none' }} />
-            {simulating ? 'Simulando...' : 'Simular datos históricos (90 días)'}
-          </button>
-        </div>
-        {!modeloListo && (
-          <div style={{ marginTop: 14, padding: '12px 16px', borderRadius: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.20)', fontSize: 13, color: '#92400e', lineHeight: 1.6 }}>
-            <strong>Sin modelo entrenado.</strong> Si la bodega aún no tiene historial de ventas, usa <strong>"Simular datos históricos"</strong>
-            {' '}para que el sistema genere patrones de consumo representativos y pueda aprender.
-          </div>
-        )}
-      </div>
-
-      {/* ── Métricas del modelo ── */}
-      {modeloListo && (
-        <div style={{ background: 'rgba(255,255,255,0.45)', borderRadius: 18, border: '1px solid rgba(255,255,255,0.60)', padding: '18px 22px', boxShadow: '0 6px 24px rgba(0,0,0,0.06)' }}>
-          <button
-            onClick={() => setShowMetrics(v => !v)}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0, width: '100%' }}>
-            <BarChart2 size={16} color="#6366f1" />
-            <span style={{ fontWeight: 900, color: '#0b2a52', fontSize: 15 }}>Métricas de Evaluación del Modelo</span>
-            {showMetrics ? <ChevronUp size={16} color="rgba(11,42,82,0.45)" style={{ marginLeft: 'auto' }} /> : <ChevronDown size={16} color="rgba(11,42,82,0.45)" style={{ marginLeft: 'auto' }} />}
-          </button>
-          {showMetrics && (
-            <>
-              <p style={{ margin: '8px 0 14px', fontSize: 13, color: 'rgba(11,42,82,0.55)', lineHeight: 1.6 }}>
-                Calculadas mediante validación hold-out (80% entrenamiento / 20% prueba). Estas métricas miden la precisión del algoritmo Random Forest.
-              </p>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <MetricCard
-                  label="MAE" icon={Target}
-                  value={metricas?.mae}
-                  desc="Error promedio absoluto (unidades)"
-                  color="#6366f1"
-                />
-                <MetricCard
-                  label="RMSE" icon={Activity}
-                  value={metricas?.rmse}
-                  desc="Penaliza errores grandes"
-                  color="#f59e0b"
-                />
-                <MetricCard
-                  label="R² Score" icon={Zap}
-                  value={metricas?.r2}
-                  desc={metricas?.r2 != null ? (metricas.r2 >= 0.8 ? 'Precisión alta ✓' : metricas.r2 >= 0.6 ? 'Precisión aceptable' : 'Mejorable — más datos') : 'Precisión general del modelo'}
-                  color={metricas?.r2 != null ? (metricas.r2 >= 0.8 ? '#10b981' : metricas.r2 >= 0.6 ? '#f59e0b' : '#ef4444') : '#6b7280'}
-                />
-              </div>
-              {metricas?.nota && (
-                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'rgba(11,42,82,0.50)', fontWeight: 700 }}>
-                  <Info size={13} />{metricas.nota}
-                </div>
-              )}
-              <div style={{ marginTop: 10, fontSize: 12, color: 'rgba(11,42,82,0.40)', fontWeight: 700 }}>
-                Última actualización: {mlStatus?.ultima_actualizacion ? new Date(mlStatus.ultima_actualizacion).toLocaleString('es-PE') : '—'}
-                {' '}· {mlStatus?.registros_entrenamiento ?? 0} registros
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
       {/* ── Controles de predicción ── */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
