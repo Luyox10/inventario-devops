@@ -120,7 +120,7 @@ export default function AdminPrediccionesPage() {
           background: modeloListo ? 'rgba(16,185,129,0.10)' : 'rgba(245,158,11,0.10)',
           border: `1px solid ${modeloListo ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`,
         }}>
-          <Cpu size={15} color={modeloListo ? '#10b981' : '#f59e0b'} />
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: modeloListo ? '#10b981' : '#f59e0b', display: 'inline-block' }} />
           <span style={{ fontSize: 12, fontWeight: 800, color: modeloListo ? '#065f46' : '#92400e' }}>
             {mlStatus === null ? 'Verificando...' : modeloListo ? 'Modelo listo' : 'Sin entrenar'}
           </span>
