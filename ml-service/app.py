@@ -172,22 +172,6 @@ def train():
     })
 
 
-@app.get('/metrics')
-def metrics():
-    """Devuelve las metricas del ultimo entrenamiento."""
-    if _model is None:
-        return jsonify({
-            'error': 'El modelo no ha sido entrenado aun.',
-            'modelo_listo': False,
-        }), 503
-    return jsonify({
-        'modelo_listo': True,
-        'ultima_actualizacion': _last_trained,
-        'registros_entrenamiento': _training_rows,
-        'metricas': _metrics,
-    })
-
-
 @app.post('/predict')
 def predict():
     """
@@ -225,14 +209,15 @@ def predict():
 
     today = datetime.today()
     resultados = []
+    prod_idx = []
+    rows = []
 
     for prod in productos:
-        predicciones_diarias = []
-
+        producto_id = prod.get('producto_id')
         for d in range(dias):
             fecha = today + timedelta(days=d)
-            row = {
-                'producto_id':  prod.get('producto_id'),
+            rows.append({
+                'producto_id':  producto_id,
                 'categoria':    prod.get('categoria', 'Sin categoria'),
                 'dia_semana':   fecha.weekday(),
                 'mes':          fecha.month,
@@ -240,19 +225,27 @@ def predict():
                 'semana_anio':  fecha.isocalendar()[1],
                 'precio':       float(prod.get('precio', 0)),
                 'stock_actual': float(prod.get('stock_actual', 0)),
-            }
-            tmp = pd.DataFrame([row])
-            tmp_enc = encode_categoricals(tmp, _encoders)
-            X_pred = tmp_enc[FEATURE_COLS].fillna(0)
-            pred = float(_model.predict(X_pred)[0])
-            predicciones_diarias.append(max(0, round(pred, 2)))
+            })
+            prod_idx.append(producto_id)
 
-        total_predicho = round(sum(predicciones_diarias), 2)
+    df = pd.DataFrame(rows)
+    df_enc = encode_categoricals(df, _encoders)
+    X_pred = df_enc[FEATURE_COLS].fillna(0)
+    preds = np.maximum(0, _model.predict(X_pred))
+
+    daily_by_product = {}
+    for producto_id, pred in zip(prod_idx, preds):
+        daily_by_product.setdefault(producto_id, []).append(round(float(pred)))
+
+    for prod in productos:
+        producto_id = prod.get('producto_id')
+        predicciones_diarias = daily_by_product.get(producto_id, [0] * dias)
+        total_predicho = round(sum(predicciones_diarias))
         stock_seguridad = round(total_predicho * SAFETY_STOCK_FACTOR)
         inventario_recomendado = round(total_predicho + stock_seguridad)
 
         resultados.append({
-            'producto_id':            prod.get('producto_id'),
+            'producto_id':            producto_id,
             'nombre':                 prod.get('nombre', ''),
             'categoria':              prod.get('categoria', 'Sin categoria'),
             'unidad':                 prod.get('unidad', 'und'),

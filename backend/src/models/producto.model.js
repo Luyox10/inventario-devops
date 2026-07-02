@@ -177,16 +177,16 @@ async function updateProducto(id, { nombre, sku, categoria, unidad, descripcion,
   if (!existing) return null;
 
   const next = {
-    nombre: nombre ?? existing.nombre,
-    sku: sku ?? existing.sku,
-    categoria: categoria ?? existing.categoria ?? 'Sin categoria',
-    unidad: unidad ?? existing.unidad,
-    descripcion: descripcion ?? existing.descripcion,
-    precio: precio ?? existing.precio,
-    stock_actual: stock_actual ?? existing.stock_actual,
-    stock_minimo: stock_minimo ?? existing.stock_minimo,
-    activo: activo ?? existing.activo,
-    expiry_date: expiry_date == null ? existing.expiry_date : parseDateOnly(expiry_date),
+    nombre: nombre !== undefined ? nombre : existing.nombre,
+    sku: sku !== undefined ? sku : existing.sku,
+    categoria: categoria !== undefined ? categoria : existing.categoria ?? 'Sin categoria',
+    unidad: unidad !== undefined ? unidad : existing.unidad,
+    descripcion: descripcion !== undefined ? descripcion : existing.descripcion,
+    precio: precio !== undefined ? precio : existing.precio,
+    stock_actual: stock_actual !== undefined ? stock_actual : existing.stock_actual,
+    stock_minimo: stock_minimo !== undefined ? stock_minimo : existing.stock_minimo,
+    activo: activo !== undefined ? activo : existing.activo,
+    expiry_date: expiry_date !== undefined ? (expiry_date == null ? null : parseDateOnly(expiry_date)) : existing.expiry_date,
   };
 
   await pool.query(

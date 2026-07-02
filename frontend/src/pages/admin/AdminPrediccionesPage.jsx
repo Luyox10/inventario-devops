@@ -5,17 +5,51 @@ import {
 } from 'recharts';
 import {
   BrainCircuit, RefreshCw, AlertTriangle,
-  TrendingUp, Package, ShoppingCart, CheckCircle2, ArrowUp,
+  TrendingUp, Package, ShoppingCart, CheckCircle2, ArrowUp, Download,
 } from 'lucide-react';
 import { useAuth } from '../../state/auth/AuthContext.jsx';
 import {
   getMLHealth, getPredictiones,
 } from '../../api/predicciones.js';
+import * as XLSX from 'xlsx';
 
 const DIAS_OPTS = [7, 14, 30];
 
 function formatNum(n, dec = 1) {
   return Number(n ?? 0).toLocaleString('es-PE', { maximumFractionDigits: dec });
+}
+
+function downloadExcel(rows, columns, filename, sheetName = 'Datos') {
+  const header = columns.map(c => c.label);
+  const data = rows.map(row => columns.map(c => c.get(row)));
+  const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
+
+  ws['!cols'] = columns.map(c => ({ wch: c.width || 18 }));
+
+  for (let i = 0; i < header.length; i++) {
+    const cellRef = XLSX.utils.encode_cell({ r: 0, c: i });
+    if (!ws[cellRef]) ws[cellRef] = { v: header[i] };
+    ws[cellRef].s = {
+      font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 },
+      fill: { fgColor: { rgb: '0B2A52' }, patternType: 'solid' },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    };
+  }
+
+  for (let r = 1; r <= data.length; r++) {
+    for (let c = 0; c < columns.length; c++) {
+      const cellRef = XLSX.utils.encode_cell({ r, c });
+      if (!ws[cellRef]) continue;
+      const style = { ...(ws[cellRef].s || {}) };
+      if (columns[c].format) style.numFmt = columns[c].format;
+      if (columns[c].align) style.alignment = { horizontal: columns[c].align, vertical: 'center' };
+      ws[cellRef].s = style;
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, filename);
 }
 
 
@@ -29,7 +63,11 @@ export default function AdminPrediccionesPage() {
   const [error, setError]               = useState(null);
   const [selectedProd, setSelectedProd] = useState(null);
   const [catFilter, setCatFilter]       = useState('Todos');
+  const [search, setSearch]             = useState('');
   const [tab, setTab]                   = useState('tabla');
+  const [predType, setPredType]         = useState('demanda');
+  const [page, setPage]                 = useState(1);
+  const PAGE_SIZE                       = 20;
 
   const checkHealth = useCallback(async () => {
     try {
@@ -42,12 +80,14 @@ export default function AdminPrediccionesPage() {
     }
   }, [token]);
 
-  async function handlePredict() {
+  async function handlePredict(diasToUse = dias) {
     setLoading(true); setError(null);
     try {
-      const data = await getPredictiones({ token, dias });
+      const data = await getPredictiones({ token, dias: diasToUse });
       setResult(data);
       setCatFilter('Todos');
+      setSearch('');
+      setPage(1);
       setSelectedProd(data?.resultados?.[0] ?? null);
     } catch (err) {
       if (err.status === 503) {
@@ -72,13 +112,33 @@ export default function AdminPrediccionesPage() {
 
   const resultadosFiltrados = useMemo(() => {
     if (!result?.resultados) return [];
-    if (catFilter === 'Todos') return result.resultados;
-    return result.resultados.filter(r => (r.categoria || 'Sin categoría') === catFilter);
-  }, [result, catFilter]);
+    const s = search.trim().toLowerCase();
+    return result.resultados.filter(r => {
+      const matchesCat = catFilter === 'Todos' || (r.categoria || 'Sin categoría') === catFilter;
+      const matchesSearch = !s || String(r.nombre || '').toLowerCase().includes(s);
+      return matchesCat && matchesSearch;
+    });
+  }, [result, catFilter, search]);
+
+  const totalPages = Math.max(1, Math.ceil(resultadosFiltrados.length / PAGE_SIZE));
+  const resultadosVisibles = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return resultadosFiltrados.slice(start, start + PAGE_SIZE);
+  }, [resultadosFiltrados, page]);
+
+  useEffect(() => { setPage(1); }, [catFilter, search]);
 
   const necesitanReposicion = result?.resultados?.filter(r => r.necesita_reposicion) ?? [];
   const totalUnidades = result?.resultados?.reduce((acc, r) => acc + r.prediccion_total, 0) ?? 0;
   const totalRecomendado = result?.resultados?.reduce((acc, r) => acc + r.inventario_recomendado, 0) ?? 0;
+
+  const ingresosData = useMemo(() => {
+    if (!result?.resultados) return [];
+    return [...result.resultados]
+      .map(r => ({ ...r, ingreso_estimado: Number(r.prediccion_total || 0) * Number(r.precio || 0) }))
+      .sort((a, b) => b.ingreso_estimado - a.ingreso_estimado);
+  }, [result]);
+  const totalIngresos = ingresosData.reduce((acc, r) => acc + r.ingreso_estimado, 0);
 
   const chartData = selectedProd
     ? selectedProd.prediccion_diaria.map((v, i) => {
@@ -143,7 +203,7 @@ export default function AdminPrediccionesPage() {
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <span style={{ fontSize: 12, fontWeight: 800, color: 'rgba(11,42,82,0.55)' }}>Horizonte:</span>
           {DIAS_OPTS.map(d => (
-            <button key={d} onClick={() => setDias(d)}
+            <button key={d} onClick={() => { setDias(d); if (modeloListo) handlePredict(d); }}
               style={{ ...s.pillBtn, ...(dias === d ? s.pillBtnActive : {}) }}>
               {d} días
             </button>
@@ -156,8 +216,23 @@ export default function AdminPrediccionesPage() {
         </button>
       </div>
 
-      {/* ── Resultados ── */}
+      {/* ── Tipo de predicción ── */}
       {result && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {[
+            { key: 'demanda', label: 'Demanda e inventario', icon: Package },
+            { key: 'ingresos', label: 'Ingresos estimados', icon: TrendingUp },
+          ].map(({ key, label, icon: Icon }) => (
+            <button key={key} onClick={() => setPredType(key)}
+              style={{ ...s.pillBtn, ...(predType === key ? s.pillBtnActive : {}), display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <Icon size={14} />{label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Resultados ── */}
+      {result && predType === 'demanda' && (
         <>
           {/* KPIs */}
           <div style={s.kpiGrid}>
@@ -165,8 +240,8 @@ export default function AdminPrediccionesPage() {
               { icon: ShoppingCart, color: '#6366f1', bg: 'rgba(99,102,241,0.10)', val: result.resultados?.length ?? 0, lbl: 'Productos analizados' },
               { icon: AlertTriangle, color: '#ef4444', bg: 'rgba(239,68,68,0.10)', val: necesitanReposicion.length, lbl: 'Requieren reposición' },
               { icon: CheckCircle2, color: '#10b981', bg: 'rgba(16,185,129,0.10)', val: (result.resultados?.length ?? 0) - necesitanReposicion.length, lbl: 'Stock suficiente' },
-              { icon: TrendingUp, color: '#f59e0b', bg: 'rgba(245,158,11,0.10)', val: formatNum(totalUnidades), lbl: `Uds. estimadas (${dias}d)` },
-              { icon: Package, color: '#8b5cf6', bg: 'rgba(139,92,246,0.10)', val: formatNum(totalRecomendado), lbl: 'Inv. total recomendado' },
+              { icon: TrendingUp, color: '#f59e0b', bg: 'rgba(245,158,11,0.10)', val: formatNum(totalUnidades, 0), lbl: `Uds. estimadas (${dias}d)` },
+              { icon: Package, color: '#8b5cf6', bg: 'rgba(139,92,246,0.10)', val: formatNum(totalRecomendado, 0), lbl: 'Inv. total recomendado' },
             ].map(({ icon: Icon, color, bg, val, lbl }) => (
               <div key={lbl} style={s.kpiCard}>
                 <div style={{ ...s.kpiIcon, background: bg }}><Icon size={18} color={color} /></div>
@@ -174,6 +249,23 @@ export default function AdminPrediccionesPage() {
                 <div style={s.kpiLbl}>{lbl}</div>
               </div>
             ))}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button onClick={() => downloadExcel(resultadosFiltrados, [
+              { label: 'Producto', get: r => r.nombre, width: 36, align: 'left' },
+              { label: 'Categoría', get: r => r.categoria, width: 18, align: 'left' },
+              { label: 'Unidad', get: r => r.unidad, width: 10, align: 'center' },
+              { label: 'Stock actual', get: r => r.stock_actual, width: 14, align: 'right', format: '#,##0' },
+              { label: `Predicción (${dias}d)`, get: r => r.prediccion_total, width: 14, align: 'right', format: '#,##0' },
+              { label: 'Stock de seguridad', get: r => r.stock_seguridad, width: 18, align: 'right', format: '#,##0' },
+              { label: 'Inventario recomendado', get: r => r.inventario_recomendado, width: 22, align: 'right', format: '#,##0' },
+              { label: 'Cantidad a reponer', get: r => Math.max(0, r.inventario_recomendado - r.stock_actual), width: 18, align: 'right', format: '#,##0' },
+              { label: 'Requiere reposición', get: r => r.necesita_reposicion ? 'Sí' : 'No', width: 18, align: 'center' },
+            ], `prediccion_demanda_${dias}d_${new Date().toISOString().slice(0, 10)}.xlsx`, 'Demanda e inventario')}
+              style={{ ...s.btn, fontSize: 12, padding: '7px 14px' }}>
+              <Download size={14} /> Exportar Excel
+            </button>
           </div>
 
           {/* Tabs */}
@@ -191,15 +283,26 @@ export default function AdminPrediccionesPage() {
 
               {/* Tabla */}
               <div style={{ background: 'rgba(255,255,255,0.45)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.55)', overflow: 'hidden', boxShadow: '0 6px 24px rgba(0,0,0,0.06)' }}>
-                {/* Filtro categoría */}
-                <div style={{ display: 'flex', gap: 6, padding: '12px 14px', borderBottom: '1px solid rgba(11,42,82,0.07)', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 11, fontWeight: 900, color: 'rgba(11,42,82,0.45)', alignSelf: 'center' }}>CATEGORÍA:</span>
-                  {categorias.map(c => (
-                    <button key={c} onClick={() => setCatFilter(c)}
-                      style={{ ...s.pillBtn, fontSize: 11, padding: '4px 10px', ...(catFilter === c ? s.pillBtnActive : {}) }}>{c}</button>
-                  ))}
+                {/* Filtros */}
+                <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderBottom: '1px solid rgba(11,42,82,0.07)', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 180 }}>
+                    <span style={{ fontSize: 11, fontWeight: 900, color: 'rgba(11,42,82,0.45)' }}>CATEGORÍA:</span>
+                    <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}
+                      style={{ ...s.select, flex: 1, fontSize: 12, padding: '6px 10px' }}>
+                      {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 200 }}>
+                    <span style={{ fontSize: 11, fontWeight: 900, color: 'rgba(11,42,82,0.45)' }}>BUSCAR:</span>
+                    <input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Nombre de producto..."
+                      style={{ ...s.input, flex: 1, fontSize: 12, padding: '6px 10px' }}
+                    />
+                  </div>
                 </div>
-                <div style={{ overflowX: 'auto' }}>
+                <div style={{ overflowX: 'auto', maxHeight: '60vh', overflowY: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: 'rgba(11,42,82,0.04)', borderBottom: '1.5px solid rgba(11,42,82,0.09)' }}>
@@ -213,12 +316,13 @@ export default function AdminPrediccionesPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {resultadosFiltrados.map((r, idx) => {
+                      {resultadosVisibles.map((r, idx) => {
+                        const idxGlobal = (page - 1) * PAGE_SIZE + idx;
                         const activo = selectedProd?.producto_id === r.producto_id;
                         return (
                           <tr key={r.producto_id} onClick={() => setSelectedProd(r)}
                             style={{
-                              background: activo ? 'rgba(99,102,241,0.07)' : idx % 2 === 0 ? 'transparent' : 'rgba(11,42,82,0.02)',
+                              background: activo ? 'rgba(99,102,241,0.07)' : idxGlobal % 2 === 0 ? 'transparent' : 'rgba(11,42,82,0.02)',
                               borderBottom: '1px solid rgba(11,42,82,0.07)',
                               cursor: 'pointer',
                               borderLeft: activo ? '4px solid #6366f1' : '4px solid transparent',
@@ -229,9 +333,9 @@ export default function AdminPrediccionesPage() {
                             </td>
                             <td style={{ ...s.td, fontSize: 12, color: 'rgba(11,42,82,0.60)', fontWeight: 700 }}>{r.categoria}</td>
                             <td style={{ ...s.td, textAlign: 'right', fontWeight: 700, color: 'rgba(11,42,82,0.70)', fontSize: 13 }}>{r.stock_actual}</td>
-                            <td style={{ ...s.td, textAlign: 'right', fontWeight: 900, color: '#6366f1', fontSize: 14 }}>{formatNum(r.prediccion_total)}</td>
-                            <td style={{ ...s.td, textAlign: 'right', fontWeight: 700, color: 'rgba(11,42,82,0.55)', fontSize: 13 }}>+{r.stock_seguridad}</td>
-                            <td style={{ ...s.td, textAlign: 'right', fontWeight: 900, color: '#0b2a52', fontSize: 14 }}>{r.inventario_recomendado}</td>
+                            <td style={{ ...s.td, textAlign: 'right', fontWeight: 900, color: '#6366f1', fontSize: 14 }}>{formatNum(r.prediccion_total, 0)}</td>
+                            <td style={{ ...s.td, textAlign: 'right', fontWeight: 700, color: 'rgba(11,42,82,0.55)', fontSize: 13 }}>+{formatNum(r.stock_seguridad, 0)}</td>
+                            <td style={{ ...s.td, textAlign: 'right', fontWeight: 900, color: '#0b2a52', fontSize: 14 }}>{formatNum(r.inventario_recomendado, 0)}</td>
                             <td style={s.td}>
                               {r.necesita_reposicion ? (
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 900, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.28)', color: '#dc2626' }}>
@@ -249,8 +353,22 @@ export default function AdminPrediccionesPage() {
                     </tbody>
                   </table>
                 </div>
-                <div style={{ padding: '8px 16px', borderTop: '1px solid rgba(11,42,82,0.07)', fontSize: 12, color: 'rgba(11,42,82,0.40)', fontWeight: 700 }}>
-                  {resultadosFiltrados.length} productos · Inventario recomendado = Predicción + Stock de seguridad (25%) · Haz clic en una fila para ver su gráfico
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderTop: '1px solid rgba(11,42,82,0.07)', fontSize: 12, color: 'rgba(11,42,82,0.40)', fontWeight: 700 }}>
+                  <span>
+                    Página {page} de {totalPages} · {resultadosFiltrados.length} productos · Inventario recomendado = Predicción + Stock de seguridad (25%)
+                  </span>
+                  {totalPages > 1 && (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                        style={{ ...s.pillBtn, fontSize: 11, padding: '4px 12px', opacity: page === 1 ? 0.5 : 1 }}>
+                        Anterior
+                      </button>
+                      <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                        style={{ ...s.pillBtn, fontSize: 11, padding: '4px 12px', opacity: page === totalPages ? 0.5 : 1 }}>
+                        Siguiente
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -268,10 +386,10 @@ export default function AdminPrediccionesPage() {
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
                       {[
-                        { label: 'Stock actual',     val: `${selectedProd.stock_actual} ${selectedProd.unidad}`,                  color: '#0b2a52' },
-                        { label: `Predicción (${dias}d)`, val: `${formatNum(selectedProd.prediccion_total)} ${selectedProd.unidad}`, color: '#6366f1' },
-                        { label: 'Stock seguridad',  val: `+${selectedProd.stock_seguridad} ${selectedProd.unidad}`,               color: '#f59e0b' },
-                        { label: 'Inv. recomendado', val: `${selectedProd.inventario_recomendado} ${selectedProd.unidad}`,         color: selectedProd.necesita_reposicion ? '#ef4444' : '#10b981' },
+                        { label: 'Stock actual',     val: `${formatNum(selectedProd.stock_actual, 0)} ${selectedProd.unidad}`,                  color: '#0b2a52' },
+                        { label: `Predicción (${dias}d)`, val: `${formatNum(selectedProd.prediccion_total, 0)} ${selectedProd.unidad}`, color: '#6366f1' },
+                        { label: 'Stock seguridad',  val: `+${formatNum(selectedProd.stock_seguridad, 0)} ${selectedProd.unidad}`,               color: '#f59e0b' },
+                        { label: 'Inv. recomendado', val: `${formatNum(selectedProd.inventario_recomendado, 0)} ${selectedProd.unidad}`,         color: selectedProd.necesita_reposicion ? '#ef4444' : '#10b981' },
                       ].map(({ label, val, color }) => (
                         <div key={label} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(11,42,82,0.08)' }}>
                           <div style={{ fontSize: 10, fontWeight: 900, color: 'rgba(11,42,82,0.50)', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
@@ -301,7 +419,7 @@ export default function AdminPrediccionesPage() {
                         <XAxis dataKey="dia" tick={{ fontSize: 9, fill: 'rgba(11,42,82,0.45)', fontWeight: 700 }} axisLine={false} tickLine={false} interval={dias > 14 ? Math.floor(dias / 7) : 0} />
                         <YAxis hide />
                         <Tooltip
-                          formatter={(v) => [formatNum(v), selectedProd.unidad]}
+                          formatter={(v) => [formatNum(v, 0), selectedProd.unidad]}
                           contentStyle={{ background: 'rgba(11,42,82,0.92)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 12 }}
                           itemStyle={{ color: '#fff' }}
                           labelStyle={{ color: 'rgba(255,255,255,0.65)', fontSize: 11 }}
@@ -344,6 +462,95 @@ export default function AdminPrediccionesPage() {
         </>
       )}
 
+      {result && predType === 'ingresos' && (
+        <>
+          <div style={s.kpiGrid}>
+            {[
+              { icon: ShoppingCart, color: '#6366f1', bg: 'rgba(99,102,241,0.10)', val: ingresosData.length, lbl: 'Productos analizados' },
+              { icon: TrendingUp, color: '#10b981', bg: 'rgba(16,185,129,0.10)', val: `S/ ${formatNum(totalIngresos, 2)}`, lbl: `Ingresos estimados (${dias}d)` },
+              { icon: Package, color: '#f59e0b', bg: 'rgba(245,158,11,0.10)', val: ingresosData[0]?.nombre || '-', lbl: 'Producto más rentable' },
+              { icon: CheckCircle2, color: '#8b5cf6', bg: 'rgba(139,92,246,0.10)', val: `S/ ${formatNum(ingresosData[0]?.ingreso_estimado || 0, 2)}`, lbl: 'Ingreso top 1' },
+            ].map(({ icon: Icon, color, bg, val, lbl }) => (
+              <div key={lbl} style={s.kpiCard}>
+                <div style={{ ...s.kpiIcon, background: bg }}><Icon size={18} color={color} /></div>
+                <div style={{ ...s.kpiNum, color, fontSize: typeof val === 'string' && val.length > 12 ? 16 : 24 }}>{val}</div>
+                <div style={s.kpiLbl}>{lbl}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button onClick={() => downloadExcel(ingresosData, [
+              { label: 'Producto', get: r => r.nombre, width: 36, align: 'left' },
+              { label: 'Categoría', get: r => r.categoria, width: 18, align: 'left' },
+              { label: 'Unidad', get: r => r.unidad, width: 10, align: 'center' },
+              { label: `Predicción (${dias}d)`, get: r => r.prediccion_total, width: 14, align: 'right', format: '#,##0' },
+              { label: 'Precio', get: r => r.precio, width: 12, align: 'right', format: 'S/ #,##0.00' },
+              { label: 'Ingreso estimado', get: r => r.ingreso_estimado, width: 20, align: 'right', format: 'S/ #,##0.00' },
+            ], `prediccion_ingresos_${dias}d_${new Date().toISOString().slice(0, 10)}.xlsx`, 'Ingresos estimados')}
+              style={{ ...s.btn, fontSize: 12, padding: '7px 14px' }}>
+              <Download size={14} /> Exportar Excel
+            </button>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.45)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.55)', padding: '20px 22px', boxShadow: '0 6px 24px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontWeight: 900, color: '#0b2a52', fontSize: 14, marginBottom: 4 }}>
+              Top 10 productos — Ingresos estimados
+            </div>
+            <div style={{ fontSize: 12, color: 'rgba(11,42,82,0.50)', marginBottom: 16, fontWeight: 700 }}>
+              Ingreso = Predicción ({dias}d) × Precio unitario
+            </div>
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={ingresosData.slice(0, 10).map(r => ({ nombre: r.nombre.length > 14 ? r.nombre.slice(0, 14) + '…' : r.nombre, ingreso: r.ingreso_estimado }))} margin={{ top: 4, right: 16, left: 0, bottom: 40 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(11,42,82,0.07)" vertical={false} />
+                <XAxis dataKey="nombre" tick={{ fontSize: 10, fill: 'rgba(11,42,82,0.55)', fontWeight: 700 }} axisLine={false} tickLine={false} angle={-30} textAnchor="end" interval={0} />
+                <YAxis tick={{ fontSize: 10, fill: 'rgba(11,42,82,0.45)', fontWeight: 700 }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  formatter={(v) => [`S/ ${formatNum(v, 2)}`, 'Ingreso estimado']}
+                  contentStyle={{ background: 'rgba(11,42,82,0.92)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 12 }}
+                  itemStyle={{ color: '#fff' }}
+                  labelStyle={{ color: 'rgba(255,255,255,0.65)', fontSize: 11 }}
+                />
+                <Bar dataKey="ingreso" name="Ingreso estimado" fill="#10b981" radius={[4,4,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.45)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.55)', overflow: 'hidden', boxShadow: '0 6px 24px rgba(0,0,0,0.06)' }}>
+            <div style={{ overflowX: 'auto', maxHeight: '60vh', overflowY: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(11,42,82,0.04)', borderBottom: '1.5px solid rgba(11,42,82,0.09)' }}>
+                    <th style={s.th}>Producto</th>
+                    <th style={s.th}>Categoría</th>
+                    <th style={{ ...s.th, textAlign: 'right' }}>Predicción ({dias}d)</th>
+                    <th style={{ ...s.th, textAlign: 'right' }}>Precio</th>
+                    <th style={{ ...s.th, textAlign: 'right' }}>Ingreso estimado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ingresosData.slice(0, 50).map((r, idx) => (
+                    <tr key={r.producto_id} style={{ background: idx % 2 === 0 ? 'transparent' : 'rgba(11,42,82,0.02)', borderBottom: '1px solid rgba(11,42,82,0.07)' }}>
+                      <td style={s.td}>
+                        <div style={{ fontWeight: 800, color: '#0b2a52', fontSize: 13 }}>{r.nombre}</div>
+                        <div style={{ fontSize: 11, color: 'rgba(11,42,82,0.45)', fontWeight: 700 }}>{r.unidad}</div>
+                      </td>
+                      <td style={{ ...s.td, fontSize: 12, color: 'rgba(11,42,82,0.60)', fontWeight: 700 }}>{r.categoria}</td>
+                      <td style={{ ...s.td, textAlign: 'right', fontWeight: 900, color: '#6366f1', fontSize: 14 }}>{formatNum(r.prediccion_total, 0)}</td>
+                      <td style={{ ...s.td, textAlign: 'right', fontWeight: 700, color: 'rgba(11,42,82,0.70)', fontSize: 13 }}>S/ {formatNum(r.precio, 2)}</td>
+                      <td style={{ ...s.td, textAlign: 'right', fontWeight: 900, color: '#10b981', fontSize: 14 }}>S/ {formatNum(r.ingreso_estimado, 2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(11,42,82,0.07)', fontSize: 12, color: 'rgba(11,42,82,0.40)', fontWeight: 700 }}>
+              Mostrando top {Math.min(50, ingresosData.length)} productos · Ordenados por ingreso estimado
+            </div>
+          </div>
+        </>
+      )}
+
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
@@ -359,6 +566,16 @@ const s = {
     padding: '6px 13px', borderRadius: 999, border: '1.5px solid rgba(11,42,82,0.13)',
     background: 'rgba(255,255,255,0.45)', color: 'rgba(11,42,82,0.65)',
     fontSize: 12, fontWeight: 800, cursor: 'pointer',
+  },
+  input: {
+    padding: '8px 12px', borderRadius: 10, border: '1.5px solid rgba(11,42,82,0.15)',
+    background: 'rgba(255,255,255,0.55)', color: '#0b2a52', fontSize: 13,
+    outline: 'none', fontWeight: 700,
+  },
+  select: {
+    padding: '8px 12px', borderRadius: 10, border: '1.5px solid rgba(11,42,82,0.15)',
+    background: 'rgba(255,255,255,0.55)', color: '#0b2a52', fontSize: 13,
+    outline: 'none', fontWeight: 700, cursor: 'pointer',
   },
   pillBtnActive: { background: '#0b2a52', color: '#fff', borderColor: '#0b2a52' },
   kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 },

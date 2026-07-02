@@ -89,8 +89,4 @@ async function getMLHealth() {
   return res.json();
 }
 
-async function getMetrics() {
-  return fetchML('/metrics', undefined, 'GET');
-}
-
-module.exports = { trainModelo, simulateAndTrain, getPredictiones, getMLHealth, getMetrics };
+module.exports = { trainModelo, simulateAndTrain, getPredictiones, getMLHealth };

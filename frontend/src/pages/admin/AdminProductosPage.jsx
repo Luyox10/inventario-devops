@@ -196,6 +196,7 @@ export default function AdminProductosPage() {
     setEditForm({
       nombre: row.nombre ?? '',
       sku: row.sku ?? '',
+      categoria: row.categoria ?? 'Sin categoría',
       unidad: row.unidad ?? 'und',
       descripcion: row.descripcion ?? '',
       expiry_date: row.expiry_date ?? '',
@@ -316,6 +317,7 @@ export default function AdminProductosPage() {
       const payload = {
         nombre: editForm.nombre.trim(),
         sku: editForm.sku.trim(),
+        categoria: editForm.categoria,
         unidad: editForm.unidad,
         descripcion: editForm.descripcion.trim() || null,
         expiry_date: editForm.expiry_date || null,

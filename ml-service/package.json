@@ -1,0 +1,9 @@
+{
+  "name": "ml-service",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "python app.py",
+    "start": "gunicorn --bind 0.0.0.0:10000 --workers 2 --timeout 120 app:app"
+  }
+}
