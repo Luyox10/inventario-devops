@@ -4,8 +4,9 @@ async function health(req, res, next) {
   try {
     const data = await getMLHealth();
     res.json(data);
-  } catch {
-    res.json({ status: 'unavailable', modelo_entrenado: false });
+  } catch (err) {
+    console.error('[prediccion.controller] ML health failed:', err.message || err);
+    res.json({ status: 'unavailable', modelo_entrenado: false, error: err.message || 'ML service unreachable' });
   }
 }
 

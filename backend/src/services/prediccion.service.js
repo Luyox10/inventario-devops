@@ -86,12 +86,17 @@ async function getMLHealth(retries = 3) {
   let lastErr;
   for (let i = 0; i < retries; i += 1) {
     try {
-      const res = await fetch(`${ML_URL}/health`, {
+      const url = `${ML_URL}/health`;
+      process.stdout.write(`[ML health] attempt ${i + 1}/${retries} -> ${url}\n`);
+      const res = await fetch(url, {
         signal: AbortSignal.timeout(30000),
       });
-      return res.json();
+      const json = await res.json();
+      process.stdout.write(`[ML health] OK: ${JSON.stringify(json)}\n`);
+      return json;
     } catch (err) {
       lastErr = err;
+      process.stdout.write(`[ML health] attempt ${i + 1} failed: ${err.message || err}\n`);
       if (i < retries - 1) {
         await new Promise(r => setTimeout(r, 2000 * (i + 1)));
       }
