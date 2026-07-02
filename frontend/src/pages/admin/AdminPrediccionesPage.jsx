@@ -69,11 +69,20 @@ export default function AdminPrediccionesPage() {
   const [page, setPage]                 = useState(1);
   const PAGE_SIZE                       = 20;
 
-  const checkHealth = useCallback(async () => {
+  const checkHealth = useCallback(async (retryCount = 3) => {
     try {
-      const h = await getMLHealth({ token });
-      setMlStatus(h);
-      return h;
+      let lastErr;
+      for (let i = 0; i < retryCount; i += 1) {
+        try {
+          const h = await getMLHealth({ token });
+          setMlStatus(h);
+          return h;
+        } catch (err) {
+          lastErr = err;
+          if (i < retryCount - 1) await new Promise(r => setTimeout(r, 1500 * (i + 1)));
+        }
+      }
+      throw lastErr;
     } catch {
       setMlStatus({ status: 'unavailable', modelo_entrenado: false });
       return null;
@@ -101,6 +110,12 @@ export default function AdminPrediccionesPage() {
   }
 
   useEffect(() => { checkHealth(); }, [checkHealth]);
+
+  useEffect(() => {
+    if (mlStatus?.modelo_entrenado) return;
+    const id = setInterval(() => checkHealth(), 5000);
+    return () => clearInterval(id);
+  }, [mlStatus, checkHealth]);
 
   const modeloListo = mlStatus?.modelo_entrenado === true;
 

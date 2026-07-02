@@ -82,11 +82,22 @@ async function getPredictiones({ dias = 7 } = {}) {
   return fetchML('/predict', { productos, dias });
 }
 
-async function getMLHealth() {
-  const res = await fetch(`${ML_URL}/health`, {
-    signal: AbortSignal.timeout(5000),
-  });
-  return res.json();
+async function getMLHealth(retries = 3) {
+  let lastErr;
+  for (let i = 0; i < retries; i += 1) {
+    try {
+      const res = await fetch(`${ML_URL}/health`, {
+        signal: AbortSignal.timeout(30000),
+      });
+      return res.json();
+    } catch (err) {
+      lastErr = err;
+      if (i < retries - 1) {
+        await new Promise(r => setTimeout(r, 2000 * (i + 1)));
+      }
+    }
+  }
+  throw lastErr;
 }
 
 module.exports = { trainModelo, simulateAndTrain, getPredictiones, getMLHealth };
