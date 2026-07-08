@@ -1,0 +1,4 @@
+# Archivos/paths excluidos del escaneo de secretos de TruffleHog.
+# El certificado ca.pem es el certificado raiz publico de ISRG (Let's Encrypt)
+# y no contiene material secreto.
+backend/ca.pem

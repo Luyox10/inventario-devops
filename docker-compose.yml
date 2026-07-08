@@ -26,21 +26,19 @@ services:
       dockerfile: Dockerfile
     container_name: inventario-backend
     restart: unless-stopped
-    depends_on:
-      mysql:
-        condition: service_healthy
+    env_file:
+      - path: ./backend/.env
+        required: true
     environment:
+      # Overrides explicitos para el entorno Docker local.
+      # Los secretos (DB_PASSWORD, JWT_SECRET, BOOTSTRAP_SECRET) deben ir en backend/.env
       PORT: 3001
       CORS_ORIGIN: "*"
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: root
-      DB_PASSWORD: rootpass
       DB_NAME: inventario
       DB_TIMEZONE: America/Lima
-      JWT_SECRET: change_this_secret
-      JWT_EXPIRES_IN: 1d
-      BOOTSTRAP_SECRET: change_this_bootstrap_secret
       ML_SERVICE_URL: http://ml-service:5001
     ports:
       - '3001:3001'

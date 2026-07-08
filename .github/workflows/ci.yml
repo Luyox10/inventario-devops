@@ -77,7 +77,22 @@ jobs:
 
       - name: Prepare backend env for CI
         working-directory: backend
-        run: cp .env.test .env
+        run: |
+          cat > .env <<EOF
+          PORT=3001
+          CORS_ORIGIN=*
+          DB_HOST=127.0.0.1
+          DB_PORT=3306
+          DB_USER=root
+          DB_PASSWORD=rootpass
+          DB_NAME=inventario
+          DB_TIMEZONE=America/Lima
+          DB_SSL_REQUIRED=false
+          JWT_SECRET=ci_jwt_secret_change_me
+          JWT_EXPIRES_IN=1d
+          BOOTSTRAP_SECRET=ci_bootstrap_secret_change_me
+          ML_SERVICE_URL=http://localhost:5001
+          EOF
 
       - name: Wait for MySQL
         run: |
