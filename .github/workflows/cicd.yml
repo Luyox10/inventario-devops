@@ -302,12 +302,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build backend
-        run: npm run build -w backend
-
       - name: Build frontend
-        run: |
-          npm run build -w frontend
+        run: npm run build -w frontend
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
