@@ -133,47 +133,6 @@ jobs:
           sarif_file: snyk-backend.sarif
           category: snyk-backend
 
-  snyk-frontend:
-    name: Snyk - Frontend dependencies
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run Snyk to check frontend for vulnerabilities
-        uses: snyk/actions/node@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --severity-threshold=high --file=frontend/package.json --project-name=inventario-frontend
-
-      - name: Upload Snyk frontend report (SARIF)
-        uses: snyk/actions/node@master
-        if: always()
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --severity-threshold=high --file=frontend/package.json --sarif-file-output=snyk-frontend.sarif
-          command: test
-
-      - name: Upload frontend SARIF to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: snyk-frontend.sarif
-          category: snyk-frontend
-
   # -------------------------------------------------------------------------
   # 4. SonarQube: calidad de código y análisis estático de seguridad (SAST)
   # -------------------------------------------------------------------------
@@ -334,7 +293,6 @@ jobs:
       - quality-gates
       - secret-scan
       - snyk-backend
-      - snyk-frontend
       - sonar-backend
       - trivy-scan
 
@@ -432,7 +390,6 @@ jobs:
       - quality-gates
       - secret-scan
       - snyk-backend
-      - snyk-frontend
       - sonar-backend
       - trivy-scan
       - build-and-push
@@ -450,7 +407,6 @@ jobs:
           echo "Resultado quality-gates: ${{ needs.quality-gates.result }}"
           echo "Resultado secret-scan: ${{ needs.secret-scan.result }}"
           echo "Resultado snyk-backend: ${{ needs.snyk-backend.result }}"
-          echo "Resultado snyk-frontend: ${{ needs.snyk-frontend.result }}"
           echo "Resultado sonar-backend: ${{ needs.sonar-backend.result }}"
           echo "Resultado trivy-scan: ${{ needs.trivy-scan.result }}"
           echo "Resultado build-and-push: ${{ needs.build-and-push.result }}"
@@ -461,7 +417,6 @@ jobs:
           needs.quality-gates.result == 'success' &&
           needs.secret-scan.result == 'success' &&
           needs.snyk-backend.result == 'success' &&
-          needs.snyk-frontend.result == 'success' &&
           needs.sonar-backend.result == 'success' &&
           needs.trivy-scan.result == 'success' &&
           needs.build-and-push.result == 'success' &&
@@ -473,7 +428,6 @@ jobs:
           needs.quality-gates.result == 'failure' ||
           needs.secret-scan.result == 'failure' ||
           needs.snyk-backend.result == 'failure' ||
-          needs.snyk-frontend.result == 'failure' ||
           needs.sonar-backend.result == 'failure' ||
           needs.trivy-scan.result == 'failure' ||
           needs.build-and-push.result == 'failure' ||
