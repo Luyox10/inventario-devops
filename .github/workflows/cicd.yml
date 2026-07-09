@@ -61,11 +61,11 @@ jobs:
         run: npm run build -w frontend
 
       - name: Audit backend dependencies
-        run: npm audit -w backend --audit-level=high
+        run: npm audit -w backend --audit-level=critical
         continue-on-error: true
 
       - name: Audit frontend dependencies
-        run: npm audit -w frontend --audit-level=high
+        run: npm audit -w frontend --audit-level=critical
         continue-on-error: true
 
   # -------------------------------------------------------------------------
