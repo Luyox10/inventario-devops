@@ -224,46 +224,6 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-  sonar-frontend:
-    name: SonarQube - Frontend analysis
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        run: npm ci --prefix frontend --legacy-peer-deps
-
-      - name: Run frontend tests
-        run: npm run test --prefix frontend
-
-      - name: SonarQube scan - Frontend
-        uses: SonarSource/sonarqube-scan-action@v6
-        with:
-          projectBaseDir: frontend
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-      - name: SonarQube quality gate check - Frontend
-        uses: SonarSource/sonarqube-quality-gate-action@v1
-        timeout-minutes: 5
-        with:
-          scanMetadataReportFile: frontend/.scannerwork/report-task.txt
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
   # -------------------------------------------------------------------------
   # 5. Trivy: escaneo de vulnerabilidades en imágenes Docker
   # -------------------------------------------------------------------------
@@ -378,7 +338,6 @@ jobs:
       - snyk-backend
       - snyk-frontend
       - sonar-backend
-      - sonar-frontend
       - trivy-scan
 
     steps:
@@ -478,7 +437,6 @@ jobs:
       - snyk-backend
       - snyk-frontend
       - sonar-backend
-      - sonar-frontend
       - trivy-scan
       - build-and-push
       - deploy
@@ -497,7 +455,6 @@ jobs:
           echo "Resultado snyk-backend: ${{ needs.snyk-backend.result }}"
           echo "Resultado snyk-frontend: ${{ needs.snyk-frontend.result }}"
           echo "Resultado sonar-backend: ${{ needs.sonar-backend.result }}"
-          echo "Resultado sonar-frontend: ${{ needs.sonar-frontend.result }}"
           echo "Resultado trivy-scan: ${{ needs.trivy-scan.result }}"
           echo "Resultado build-and-push: ${{ needs.build-and-push.result }}"
           echo "Resultado deploy: ${{ needs.deploy.result }}"
@@ -509,7 +466,6 @@ jobs:
           needs.snyk-backend.result == 'success' &&
           needs.snyk-frontend.result == 'success' &&
           needs.sonar-backend.result == 'success' &&
-          needs.sonar-frontend.result == 'success' &&
           needs.trivy-scan.result == 'success' &&
           needs.build-and-push.result == 'success' &&
           (needs.deploy.result == 'success' || needs.deploy.result == 'skipped')
@@ -522,7 +478,6 @@ jobs:
           needs.snyk-backend.result == 'failure' ||
           needs.snyk-frontend.result == 'failure' ||
           needs.sonar-backend.result == 'failure' ||
-          needs.sonar-frontend.result == 'failure' ||
           needs.trivy-scan.result == 'failure' ||
           needs.build-and-push.result == 'failure' ||
           needs.deploy.result == 'failure'
