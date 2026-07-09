@@ -9,7 +9,6 @@ env:
   REGISTRY: docker.io
   BACKEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/inventario-backend
   FRONTEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/inventario-frontend
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
 
@@ -27,7 +26,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "22"
           cache: "npm"
 
       - name: Install root dependencies
@@ -110,7 +109,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: backend/package-lock.json
 
@@ -151,7 +150,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -197,7 +196,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: backend/package-lock.json
 
@@ -206,6 +205,11 @@ jobs:
 
       - name: Run backend tests
         run: npm run test --prefix backend
+
+      - name: Verify SonarCloud secrets are present
+        run: |
+          echo "SONAR_HOST_URL present: ${{ secrets.SONAR_HOST_URL != '' }}"
+          echo "SONAR_TOKEN present: ${{ secrets.SONAR_TOKEN != '' }}"
 
       - name: SonarQube scan - Backend
         uses: SonarSource/sonarqube-scan-action@v6
@@ -238,7 +242,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "22"
           cache: "npm"
 
       - name: Install and build frontend
@@ -347,7 +351,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "22"
           cache: "npm"
 
       - name: Install root dependencies
