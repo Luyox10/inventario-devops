@@ -85,7 +85,7 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          extra_args: filesystem --only-verified --exclude-paths=trufflehog-exclude.txt
+          extra_args: --only-verified --exclude-paths=trufflehog-exclude.txt
 
   # -------------------------------------------------------------------------
   # 3. Snyk: vulnerabilidades en dependencias (SCA)
