@@ -37,7 +37,7 @@ jobs:
         run: npm ci --prefix backend
 
       - name: Install frontend dependencies
-        run: npm ci --prefix frontend
+        run: npm ci --prefix frontend --legacy-peer-deps
 
       - name: Create backend .env for CI
         working-directory: backend
@@ -156,7 +156,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
-        run: npm ci --prefix frontend
+        run: npm ci --prefix frontend --legacy-peer-deps
 
       - name: Run Snyk to check frontend for vulnerabilities
         uses: snyk/actions/node@master
@@ -242,7 +242,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
-        run: npm ci --prefix frontend
+        run: npm ci --prefix frontend --legacy-peer-deps
 
       - name: Run frontend tests
         run: npm run test --prefix frontend
@@ -283,7 +283,7 @@ jobs:
 
       - name: Install and build frontend
         run: |
-          npm ci --prefix frontend
+          npm ci --prefix frontend --legacy-peer-deps
           npm run build --prefix frontend
 
       - name: Set up Docker Buildx
@@ -399,7 +399,7 @@ jobs:
 
       - name: Build frontend
         run: |
-          npm ci --prefix frontend
+          npm ci --prefix frontend --legacy-peer-deps
           npm run build --prefix frontend
 
       - name: Set up Docker Buildx
