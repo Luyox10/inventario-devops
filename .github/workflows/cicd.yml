@@ -85,9 +85,7 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
-          extra_args: --debug --only-verified --exclude-paths=trufflehog-exclude.txt
+          extra_args: filesystem --only-verified --exclude-paths=trufflehog-exclude.txt
 
   # -------------------------------------------------------------------------
   # 3. Snyk: vulnerabilidades en dependencias (SCA)
