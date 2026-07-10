@@ -118,6 +118,7 @@ export default function AdminPrediccionesPage() {
   }, [mlStatus, checkHealth]);
 
   const modeloListo = mlStatus?.modelo_entrenado === true;
+  const entrenando = mlStatus?.status === 'training';
 
   const categorias = useMemo(() => {
     if (!result?.resultados) return [];
@@ -192,12 +193,12 @@ export default function AdminPrediccionesPage() {
         </div>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 12,
-          background: modeloListo ? 'rgba(16,185,129,0.10)' : 'rgba(245,158,11,0.10)',
-          border: `1px solid ${modeloListo ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`,
+          background: modeloListo ? 'rgba(16,185,129,0.10)' : entrenando ? 'rgba(59,130,246,0.10)' : 'rgba(245,158,11,0.10)',
+          border: `1px solid ${modeloListo ? 'rgba(16,185,129,0.25)' : entrenando ? 'rgba(59,130,246,0.25)' : 'rgba(245,158,11,0.25)'}`,
         }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: modeloListo ? '#10b981' : '#f59e0b', display: 'inline-block' }} />
-          <span style={{ fontSize: 12, fontWeight: 800, color: modeloListo ? '#065f46' : '#92400e' }}>
-            {mlStatus === null ? 'Verificando...' : modeloListo ? 'Modelo listo' : 'Sin entrenar'}
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: modeloListo ? '#10b981' : entrenando ? '#3b82f6' : '#f59e0b', display: 'inline-block' }} />
+          <span style={{ fontSize: 12, fontWeight: 800, color: modeloListo ? '#065f46' : entrenando ? '#1e40af' : '#92400e' }}>
+            {mlStatus === null ? 'Verificando...' : modeloListo ? 'Modelo listo' : entrenando ? 'Entrenando...' : 'Sin entrenar'}
           </span>
           {modeloListo && mlStatus?.registros_entrenamiento > 0 && (
             <span style={{ fontSize: 11, color: 'rgba(11,42,82,0.45)', fontWeight: 700 }}>
@@ -224,10 +225,10 @@ export default function AdminPrediccionesPage() {
             </button>
           ))}
         </div>
-        <button onClick={handlePredict} disabled={loading || !modeloListo}
-          style={{ ...s.btn, background: 'rgba(99,102,241,0.90)', color: '#fff', borderColor: 'transparent', opacity: (!modeloListo || loading) ? 0.6 : 1 }}>
-          <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-          {loading ? 'Generando...' : 'Generar predicción'}
+        <button onClick={handlePredict} disabled={loading || !modeloListo || entrenando}
+          style={{ ...s.btn, background: 'rgba(99,102,241,0.90)', color: '#fff', borderColor: 'transparent', opacity: (!modeloListo || loading || entrenando) ? 0.6 : 1 }}>
+          <RefreshCw size={14} style={{ animation: (loading || entrenando) ? 'spin 1s linear infinite' : 'none' }} />
+          {loading ? 'Generando...' : entrenando ? 'Entrenando...' : 'Generar predicción'}
         </button>
       </div>
 

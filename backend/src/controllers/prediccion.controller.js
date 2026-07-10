@@ -1,8 +1,25 @@
-const { getPredictiones, getMLHealth } = require('../services/prediccion.service');
+const { getPredictiones, getMLHealth, trainModelo } = require('../services/prediccion.service');
+
+let trainingPromise = null;
 
 async function health(req, res, next) {
   try {
     const data = await getMLHealth();
+
+    if (!data.modelo_entrenado && !trainingPromise) {
+      console.log('[prediccion.controller] Modelo no entrenado. Iniciando entrenamiento automático...');
+      trainingPromise = trainModelo()
+        .then(() => getMLHealth())
+        .catch((err) => {
+          console.error('[prediccion.controller] Error entrenando automáticamente:', err.message || err);
+        })
+        .finally(() => {
+          trainingPromise = null;
+        });
+
+      return res.json({ status: 'training', modelo_entrenado: false, mensaje: 'El modelo se está entrenando automáticamente. Intenta en unos segundos.' });
+    }
+
     res.json(data);
   } catch (err) {
     console.error('[prediccion.controller] ML health failed:', err.message || err);
