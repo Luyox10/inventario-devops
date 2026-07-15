@@ -1,0 +1,5 @@
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Backup automatico de MySQL todos los dias a las 2:00 AM
+0 2 * * * root /usr/local/bin/backup.sh >> /var/log/backup.log 2>&1
