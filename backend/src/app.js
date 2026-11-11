@@ -25,6 +25,7 @@ app.use((req, res, next) => {
     "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
   );
   res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   next();
 });
 
