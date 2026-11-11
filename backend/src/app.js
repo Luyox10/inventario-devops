@@ -19,15 +19,6 @@ const kardexRoutes = require('./routes/kardex.routes');
 
 const app = express();
 
-app.use((req, res, next) => {
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
-  );
-  res.setHeader('X-Frame-Options', 'DENY');
-  next();
-});
-
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN || '*',
