@@ -19,6 +19,9 @@ const kardexRoutes = require('./routes/kardex.routes');
 
 const app = express();
 
+// Render entrega las peticiones a través de su proxy: usar la IP real del cliente.
+app.set('trust proxy', 1);
+
 app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
