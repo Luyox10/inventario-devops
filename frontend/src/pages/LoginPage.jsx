@@ -4,30 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { loginRequest } from '../api/auth';
 import { useAuth } from '../state/auth/AuthContext.jsx';
 
-const GOOGLE_FONT = `@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&display=swap');`;
-
-const KEYFRAMES = `
-@keyframes loginSpin {
-  to { transform: rotate(360deg); }
-}
-@keyframes cardIn {
-  from { opacity: 0; transform: translateY(28px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes sphere1 {
-  0%, 100% { transform: translate(0,0); }
-  50%       { transform: translate(18px, -22px); }
-}
-@keyframes sphere2 {
-  0%, 100% { transform: translate(0,0); }
-  50%       { transform: translate(-16px, 18px); }
-}
-@keyframes sphere3 {
-  0%, 100% { transform: translate(0,0); }
-  50%       { transform: translate(14px, 14px); }
-}
-`;
-
 export default function LoginPage() {
   const navigate = useNavigate();
   const auth = useAuth();
@@ -62,7 +38,6 @@ export default function LoginPage() {
 
   return (
     <>
-      <style>{GOOGLE_FONT + KEYFRAMES}</style>
       <div style={styles.page}>
         <div style={styles.card}>
 

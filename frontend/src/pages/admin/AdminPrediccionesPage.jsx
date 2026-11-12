@@ -566,8 +566,6 @@ export default function AdminPrediccionesPage() {
           </div>
         </>
       )}
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
