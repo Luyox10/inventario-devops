@@ -19,6 +19,29 @@ const kardexRoutes = require('./routes/kardex.routes');
 
 const app = express();
 
+// Render entrega las peticiones a través de su proxy: usar la IP real del cliente.
+app.set('trust proxy', 1);
+
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+  );
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  next();
+});
+
+// Respuestas dinámicas/autenticadas: ningún navegador, proxy o CDN debe guardarlas.
+const disableCache = (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+};
+
+app.use(['/api', '/health'], disableCache);
+
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN || '*',
