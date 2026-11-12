@@ -208,8 +208,6 @@ export default function AlertasPage() {
       ) : (
         <TableAlertas items={filtered} />
       )}
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
