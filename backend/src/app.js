@@ -29,6 +29,16 @@ app.use((req, res, next) => {
   next();
 });
 
+// Respuestas dinámicas/autenticadas: ningún navegador, proxy o CDN debe guardarlas.
+const disableCache = (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+};
+
+app.use(['/api', '/health'], disableCache);
+
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN || '*',
