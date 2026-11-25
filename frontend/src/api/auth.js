@@ -6,3 +6,10 @@ export function loginRequest({ email, password }) {
     body: { email, password },
   });
 }
+
+export function logoutRequest({ token }) {
+  return apiFetch('/api/auth/logout', {
+    method: 'POST',
+    token,
+  });
+}

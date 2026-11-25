@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useMemo, useState } from 'react';
 
+import { logoutRequest } from '../../api/auth';
+
 const AuthContext = createContext(null);
 
 const STORAGE_KEY = 'inventario_auth';
@@ -42,6 +44,11 @@ export function AuthProvider({ children }) {
         writeStored(next);
       },
       logout() {
+        // Revoca el JWT en el servidor (incrementa token_version).
+        // Best-effort: si falla la red, igual se limpia la sesion local.
+        if (token) {
+          logoutRequest({ token }).catch(() => {});
+        }
         setToken(null);
         setUser(null);
         clearStored();

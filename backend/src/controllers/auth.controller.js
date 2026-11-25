@@ -29,4 +29,13 @@ async function me(req, res, next) {
   }
 }
 
-module.exports = { login, bootstrapAdmin, me };
+async function logout(req, res, next) {
+  try {
+    const result = await authService.logout(req.user.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { login, bootstrapAdmin, me, logout };

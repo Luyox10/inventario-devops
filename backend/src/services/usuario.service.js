@@ -1,7 +1,6 @@
-const bcrypt = require('bcryptjs');
-
 const usuarioModel = require('../models/usuario.model');
 const { httpError } = require('../utils/httpError');
+const { hashPassword } = require('../utils/password');
 
 function normalizeRol(rol) {
   if (!rol) return null;
@@ -24,7 +23,7 @@ async function createUsuario({ nombre, email, password, rol }) {
   const existing = await usuarioModel.findByEmail(e);
   if (existing) throw httpError(409, 'Email ya registrado');
 
-  const password_hash = await bcrypt.hash(String(password), 10);
+  const password_hash = await hashPassword(String(password));
   return usuarioModel.createUsuario({ nombre: n, email: e, password_hash, rol: r });
 }
 
@@ -66,8 +65,10 @@ async function updateUsuario(id, { nombre, email, rol, activo, password }) {
   if (!ok) throw httpError(500, 'No se pudo actualizar');
 
   if (password !== undefined && String(password).length > 0) {
-    const password_hash = await bcrypt.hash(String(password), 10);
+    const password_hash = await hashPassword(String(password));
     await usuarioModel.updatePasswordHash(userId, password_hash);
+    // Revoca todas las sesiones activas tras cambio de contrasena.
+    await usuarioModel.incrementTokenVersion(userId);
   }
 
   return usuarioModel.findById(userId);

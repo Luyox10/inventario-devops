@@ -9,9 +9,29 @@ CREATE TABLE IF NOT EXISTS usuarios (
   password_hash VARCHAR(255) NOT NULL,
   rol ENUM('ADMIN','EMPLEADO') NOT NULL,
   activo TINYINT(1) NOT NULL DEFAULT 1,
+  failed_attempts INT NOT NULL DEFAULT 0,
+  locked_until DATETIME NULL,
+  token_version INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_usuarios_email (email)
+) ENGINE=InnoDB;
+
+-- Tabla: login_attempts (auditoria anti fuerza bruta)
+CREATE TABLE IF NOT EXISTS login_attempts (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(150) NOT NULL,
+  usuario_id INT NULL,
+  ip VARCHAR(45) NULL,
+  user_agent VARCHAR(255) NULL,
+  success TINYINT(1) NOT NULL DEFAULT 0,
+  motivo VARCHAR(100) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_login_attempts_usuario FOREIGN KEY (usuario_id)
+    REFERENCES usuarios(id) ON UPDATE CASCADE ON DELETE SET NULL,
+  INDEX idx_login_attempts_email (email),
+  INDEX idx_login_attempts_created (created_at),
+  INDEX idx_login_attempts_success (success)
 ) ENGINE=InnoDB;
 
 -- Tabla: productos

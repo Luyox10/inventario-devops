@@ -18,7 +18,9 @@ async function listUsuarios({ includeInactive = true } = {}) {
 
 async function findByEmail(email) {
   const [rows] = await pool.query(
-    'SELECT id, nombre, email, password_hash, rol, activo FROM usuarios WHERE email = ? LIMIT 1',
+    `SELECT id, nombre, email, password_hash, rol, activo,
+            failed_attempts, locked_until, token_version
+     FROM usuarios WHERE email = ? LIMIT 1`,
     [email]
   );
   return rows[0] || null;
@@ -26,7 +28,7 @@ async function findByEmail(email) {
 
 async function findById(id) {
   const [rows] = await pool.query(
-    'SELECT id, nombre, email, rol, activo FROM usuarios WHERE id = ? LIMIT 1',
+    'SELECT id, nombre, email, rol, activo, token_version FROM usuarios WHERE id = ? LIMIT 1',
     [id]
   );
   return rows[0] || null;
@@ -65,6 +67,49 @@ async function updatePasswordHash(id, password_hash) {
   return result.affectedRows > 0;
 }
 
+// Incrementa el contador de intentos fallidos. Si supera maxAttempts,
+// bloquea la cuenta por lockoutMinutes minutos (locked_until).
+async function registerFailedAttempt(id, { maxAttempts, lockoutMinutes }) {
+  const [result] = await pool.query(
+    `UPDATE usuarios
+     SET failed_attempts = failed_attempts + 1,
+         locked_until = CASE
+           WHEN failed_attempts + 1 >= ? THEN DATE_ADD(NOW(), INTERVAL ? MINUTE)
+           ELSE locked_until
+         END
+     WHERE id = ?`,
+    [maxAttempts, lockoutMinutes, id]
+  );
+  return result.affectedRows > 0;
+}
+
+// Resetea intentos fallidos tras login exitoso.
+async function resetFailedAttempts(id) {
+  const [result] = await pool.query(
+    'UPDATE usuarios SET failed_attempts = 0, locked_until = NULL WHERE id = ?',
+    [id]
+  );
+  return result.affectedRows > 0;
+}
+
+// Incrementa token_version: revoca todos los JWT emitidos previamente.
+async function incrementTokenVersion(id) {
+  const [result] = await pool.query(
+    'UPDATE usuarios SET token_version = token_version + 1 WHERE id = ?',
+    [id]
+  );
+  return result.affectedRows > 0;
+}
+
+// Registra un intento de login para auditoria.
+async function insertLoginAttempt({ email, usuarioId, ip, userAgent, success, motivo }) {
+  await pool.query(
+    `INSERT INTO login_attempts (email, usuario_id, ip, user_agent, success, motivo)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [email, usuarioId ?? null, ip ?? null, userAgent ?? null, success ? 1 : 0, motivo ?? null]
+  );
+}
+
 module.exports = {
   countUsuarios,
   listUsuarios,
@@ -73,4 +118,8 @@ module.exports = {
   createUsuario,
   updateUsuario,
   updatePasswordHash,
+  registerFailedAttempt,
+  resetFailedAttempts,
+  incrementTokenVersion,
+  insertLoginAttempt,
 };
