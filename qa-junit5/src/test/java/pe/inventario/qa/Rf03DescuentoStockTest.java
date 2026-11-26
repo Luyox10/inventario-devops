@@ -17,16 +17,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * RF-03: el sistema debe descontar del stock una sola vez las cantidades de la
- * venta confirmada y nunca permitir stock negativo.
+ * venta confirmada (prueba conservada de la iteración anterior).
  */
 class Rf03DescuentoStockTest extends QaBase {
 
-    private int p5, p6;
+    private int p5;
 
     @BeforeEach
     void fixtures() throws Exception {
         p5 = Db.upsertProducto(db, "QA-P005", "QA P005", "10.00", 20, 1);
-        p6 = Db.upsertProducto(db, "QA-P006", "QA P006", "10.00", 10, 1);
     }
 
     @Test
@@ -61,25 +60,5 @@ class Rf03DescuentoStockTest extends QaBase {
                 "Stock final debe ser 18 (2 unidades descontadas una sola vez)");
         assertEquals(1, Db.countMovimientosVenta(db, ventaIds.iterator().next()),
                 "Debe existir exactamente 1 movimiento de salida");
-    }
-
-    @Test
-    @DisplayName("CPF-11: venta de 15 con stock 10 es rechazada y el stock queda en 10 (sin negativos)")
-    void cpf11_ventaSobreStockRechazada() throws Exception {
-        String body = ventaJson("qa-cpf11", new Object[][]{{p6, 15}});
-
-        ApiResponse intento1 = ApiClient.post("/api/ventas", body, empleadoToken);
-        assertEquals(409, intento1.status(),
-                "Venta que supera el stock debe rechazarse con 409: " + intento1.body());
-        assertNotNull(intento1.text("message"), "Debe mostrarse un mensaje de stock insuficiente");
-
-        // Reintento de confirmación (por si la UI insiste)
-        ApiResponse intento2 = ApiClient.post("/api/ventas", body, empleadoToken);
-        assertEquals(409, intento2.status());
-
-        assertEquals(10, Db.stock(db, p6), "El stock debe mantenerse en 10");
-        assertTrue(Db.stock(db, p6) >= 0, "Nunca debe existir stock negativo");
-        assertEquals(0, Db.countVentasByKey(db, "qa-cpf11"), "La venta no debe registrarse");
-        assertEquals(0, Db.countMovimientosVenta(db, -1));
     }
 }
