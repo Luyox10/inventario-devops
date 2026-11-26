@@ -158,8 +158,10 @@ CREATE TABLE `ventas` (
   `id` int NOT NULL AUTO_INCREMENT,
   `usuario_id` int NOT NULL,
   `total` decimal(10,2) NOT NULL,
+  `idempotency_key` varchar(64) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_ventas_idempotency` (`idempotency_key`),
   KEY `idx_ventas_usuario` (`usuario_id`),
   KEY `idx_ventas_created_at` (`created_at`),
   CONSTRAINT `fk_ventas_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE

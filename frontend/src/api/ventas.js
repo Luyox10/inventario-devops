@@ -15,11 +15,11 @@ export async function obtenerProductos(token) {
   });
 }
 
-export function crearVenta({ token, items }) {
+export function crearVenta({ token, items, idempotencyKey }) {
   return apiFetch('/api/ventas', {
     method: 'POST',
     token,
-    body: { items },
+    body: { items, idempotency_key: idempotencyKey },
   });
 }
 

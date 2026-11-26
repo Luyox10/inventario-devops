@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Trash2, Plus, ShoppingCart } from 'lucide-react';
 
 import { listProductos } from '../../api/productos';
@@ -23,6 +23,9 @@ const VentasPage = () => {
   const [productoQuery, setProductoQuery] = useState('');
   const [productoOpen, setProductoOpen]   = useState(false);
   const [cantidadInput, setCantidadInput] = useState('');
+
+  const inFlightRef = useRef(false);
+  const idemKeyRef = useRef(null);
 
   const productoById = useMemo(() => {
     const map = new Map();
@@ -137,10 +140,12 @@ const VentasPage = () => {
     setProductoQuery('');
     setProductoOpen(false);
     setCantidadInput('');
+    idemKeyRef.current = null;
   }
 
   function quitarDelCarrito(idx) {
     setCarrito((prev) => prev.filter((_, i) => i !== idx));
+    idemKeyRef.current = null;
   }
 
   function cambiarCantidad(idx, nuevaCantidad) {
@@ -157,23 +162,29 @@ const VentasPage = () => {
       ? { ...i, cantidad: qty, subtotal: Number((i.precio * qty).toFixed(2)) }
       : i
     ));
+    idemKeyRef.current = null;
   }
 
   const manejarEnvio = async (e) => {
     e.preventDefault();
+    if (inFlightRef.current) return;
     if (carrito.length === 0) return setStatus({ type: 'error', msg: '❌ Agrega al menos un producto.' });
+    inFlightRef.current = true;
+    if (!idemKeyRef.current) idemKeyRef.current = crypto.randomUUID();
     setSubmitting(true);
     setStatus({ type: 'info', msg: 'Procesando venta...' });
     try {
       const items = carrito.map((i) => ({ producto_id: Number(i.producto_id), cantidad: i.cantidad }));
-      await crearVenta({ token, items });
+      await crearVenta({ token, items, idempotencyKey: idemKeyRef.current });
       setStatus({ type: 'success', msg: '✅ ¡Venta registrada exitosamente!' });
       setCarrito([]);
+      idemKeyRef.current = null;
       setTimeout(() => setStatus({ type: '', msg: '' }), 3000);
     } catch (error) {
       setStatus({ type: 'error', msg: '❌ ' + error.message });
     } finally {
       setSubmitting(false);
+      inFlightRef.current = false;
     }
   };
 

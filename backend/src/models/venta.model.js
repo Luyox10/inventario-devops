@@ -18,12 +18,20 @@ function normalizeFromTo({ from, to }) {
   return next;
 }
 
-async function createVenta(connection, { usuario_id, total }) {
+async function createVenta(connection, { usuario_id, total, idempotency_key = null }) {
   const [result] = await connection.query(
-    'INSERT INTO ventas (usuario_id, total) VALUES (?, ?)',
-    [usuario_id, total]
+    'INSERT INTO ventas (usuario_id, total, idempotency_key) VALUES (?, ?, ?)',
+    [usuario_id, total, idempotency_key]
   );
   return result.insertId;
+}
+
+async function getVentaByIdempotencyKey(queryable, idempotency_key) {
+  const [rows] = await queryable.query(
+    'SELECT id, total FROM ventas WHERE idempotency_key = ? LIMIT 1',
+    [idempotency_key]
+  );
+  return rows[0] || null;
 }
 
 async function createDetalleVenta(connection, { venta_id, producto_id, cantidad, precio_unitario, subtotal }) {
@@ -151,6 +159,7 @@ async function getVentaDetalle(venta_id) {
 
 module.exports = {
   createVenta,
+  getVentaByIdempotencyKey,
   createDetalleVenta,
   getProductoForUpdate,
   updateProductoStock,

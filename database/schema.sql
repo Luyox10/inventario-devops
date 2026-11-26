@@ -52,10 +52,12 @@ CREATE TABLE IF NOT EXISTS ventas (
   id INT AUTO_INCREMENT PRIMARY KEY,
   usuario_id INT NOT NULL,
   total DECIMAL(10,2) NOT NULL,
+  idempotency_key VARCHAR(64) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_ventas_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
     ON UPDATE CASCADE
     ON DELETE RESTRICT,
+  UNIQUE KEY uq_ventas_idempotency (idempotency_key),
   INDEX idx_ventas_usuario (usuario_id),
   INDEX idx_ventas_created_at (created_at)
 ) ENGINE=InnoDB;

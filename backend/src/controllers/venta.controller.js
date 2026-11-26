@@ -2,9 +2,10 @@ const ventaService = require('../services/venta.service');
 
 async function crearVenta(req, res, next) {
   try {
-    const { items } = req.body || {};
-    const result = await ventaService.crearVenta({ usuarioId: req.user.id, items });
-    res.status(201).json(result);
+    const { items, idempotency_key } = req.body || {};
+    const idempotencyKey = req.get('Idempotency-Key') || idempotency_key;
+    const result = await ventaService.crearVenta({ usuarioId: req.user.id, items, idempotencyKey });
+    res.status(result.duplicated ? 200 : 201).json(result);
   } catch (err) {
     next(err);
   }

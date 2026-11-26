@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Eye } from 'lucide-react';
 
 import { listProductos } from '../../api/productos';
@@ -34,6 +34,9 @@ export default function AdminVentasPage() {
 
   const [detalleModal, setDetalleModal] = useState(null);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
+
+  const inFlightRef = useRef(false);
+  const idemKeyRef = useRef(null);
 
   const [histSort, setHistSort] = useState({ key: 'created_at', dir: 'desc' });
   const [histPageSize, setHistPageSize] = useState(10);
@@ -218,10 +221,12 @@ export default function AdminVentasPage() {
     setProductoId('');
     setProductoQuery('');
     setProductoOpen(false);
+    idemKeyRef.current = null;
   }
 
   function removeItem(producto_id) {
     setCart((prev) => prev.filter((x) => x.producto_id !== producto_id));
+    idemKeyRef.current = null;
   }
 
   async function verDetalle(id) {
@@ -239,17 +244,21 @@ export default function AdminVentasPage() {
   }
 
   async function submitVenta() {
+    if (inFlightRef.current) return;
     setError('');
     if (cart.length === 0) {
       setError('Agrega al menos un producto');
       return;
     }
 
+    inFlightRef.current = true;
+    if (!idemKeyRef.current) idemKeyRef.current = crypto.randomUUID();
     setSaving(true);
     try {
       const items = cart.map((it) => ({ producto_id: it.producto_id, cantidad: it.cantidad }));
-      await crearVenta({ token, items });
+      await crearVenta({ token, items, idempotencyKey: idemKeyRef.current });
       setCart([]);
+      idemKeyRef.current = null;
       await refreshProductos();
       await refreshHistorial();
     } catch (err) {
@@ -257,6 +266,7 @@ export default function AdminVentasPage() {
       setError(err.message || 'Error');
     } finally {
       setSaving(false);
+      inFlightRef.current = false;
     }
   }
 
