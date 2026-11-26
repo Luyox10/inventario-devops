@@ -49,9 +49,10 @@ async function login({ email, password }, req) {
     throw httpError(403, 'Usuario inactivo');
   }
 
-  // Bloqueo por cuenta: si locked_until esta en el futuro, rechaza.
-  if (user.locked_until && new Date(user.locked_until) > new Date()) {
-    const mins = Math.ceil((new Date(user.locked_until) - new Date()) / 60000);
+  // Bloqueo por cuenta: la BD calcula is_locked con su propio NOW() para
+  // evitar desajustes de zona horaria entre el servidor y la base de datos.
+  if (user.is_locked) {
+    const mins = Math.max(1, user.lockout_minutes || LOCKOUT_MINUTES);
     await audit({ email, usuarioId: user.id, success: false, motivo: 'cuenta_bloqueada', ctx });
     throw httpError(423, `Cuenta bloqueada. Intenta de nuevo en ${mins} minutos.`);
   }

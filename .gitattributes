@@ -1,0 +1,4 @@
+# Evita que Git convierta a CRLF los archivos que Linux ejecuta dentro de
+# contenedores (shebangs y crontab fallan con CRLF).
+*.sh text eol=lf
+devops/backup/crontab text eol=lf

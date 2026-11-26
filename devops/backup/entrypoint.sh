@@ -10,4 +10,5 @@ echo "[$(date)] Contenedor de backups iniciado."
 /usr/local/bin/backup.sh
 
 # Iniciar cron en primer plano para ejecutar backups programados
-exec cron -f
+# (cronie instala 'crond'; -n = foreground)
+exec crond -n

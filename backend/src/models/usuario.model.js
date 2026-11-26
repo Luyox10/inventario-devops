@@ -19,7 +19,9 @@ async function listUsuarios({ includeInactive = true } = {}) {
 async function findByEmail(email) {
   const [rows] = await pool.query(
     `SELECT id, nombre, email, password_hash, rol, activo,
-            failed_attempts, locked_until, token_version
+            failed_attempts, locked_until, token_version,
+            (locked_until IS NOT NULL AND locked_until > NOW()) AS is_locked,
+            CEIL(TIMESTAMPDIFF(SECOND, NOW(), locked_until) / 60) AS lockout_minutes
      FROM usuarios WHERE email = ? LIMIT 1`,
     [email]
   );
