@@ -106,9 +106,34 @@ public final class Db {
             st.execute("DELETE FROM ventas WHERE idempotency_key LIKE 'qa-%'");
             st.execute("DELETE m FROM movimientos m JOIN productos p ON m.producto_id = p.id "
                     + "WHERE p.sku LIKE 'QA-%'");
+            st.execute("DELETE d FROM detalle_ventas d JOIN productos p ON d.producto_id = p.id "
+                    + "WHERE p.sku LIKE 'QA-%'");
             st.execute("DELETE FROM lotes WHERE producto_id IN "
                     + "(SELECT id FROM productos WHERE sku LIKE 'QA-%')");
             st.execute("DELETE FROM productos WHERE sku LIKE 'QA-%'");
+        }
+    }
+
+    /** id máximo de ventas: baseline para limpiar ventas creadas por tests UI. */
+    public static long maxVentaId(Connection c) throws SQLException {
+        try (Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery("SELECT COALESCE(MAX(id), 0) FROM ventas")) {
+            rs.next();
+            return rs.getLong(1);
+        }
+    }
+
+    /**
+     * Borra ventas con id mayor al baseline (las creadas por la UI llevan
+     * idempotency_key UUID sin prefijo 'qa-', así que se limpian por id).
+     */
+    public static void deleteVentasDesde(Connection c, long desdeIdExclusive) throws SQLException {
+        try (Statement st = c.createStatement()) {
+            st.execute("DELETE m FROM movimientos m JOIN ventas v ON m.venta_id = v.id "
+                    + "WHERE v.id > " + desdeIdExclusive);
+            st.execute("DELETE d FROM detalle_ventas d JOIN ventas v ON d.venta_id = v.id "
+                    + "WHERE v.id > " + desdeIdExclusive);
+            st.execute("DELETE FROM ventas WHERE id > " + desdeIdExclusive);
         }
     }
 }
