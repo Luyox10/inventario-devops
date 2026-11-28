@@ -3,7 +3,9 @@ package pe.inventario.qa;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.openqa.selenium.By;
+import org.openqa.selenium.ElementClickInterceptedException;
 import org.openqa.selenium.StaleElementReferenceException;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.Actions;
@@ -127,23 +129,49 @@ public abstract class UiBaseTest extends QaBase {
      * El dropdown se re-renderiza con cada tecla (React), asi que el elemento
      * puede quedar stale entre localizarlo y clicarlo: se reintenta con
      * Actions (dispara mousedown+click reales, necesarios porque el item
-     * usa onMouseDown+preventDefault) durante ~15s.
+     * usa onMouseDown+preventDefault) durante ~15s, con esperas cortas de 2s.
+     * Si el item no aparece, se re-dispara la busqueda (espacio+backspace
+     * regenera el onChange del input sin cambiar el texto buscado).
      */
     protected boolean seleccionarDelAutocomplete(String texto) {
         By item = By.xpath("//button[.//div[contains(.,'" + texto + "')]]");
+        By buscador = By.cssSelector("input[placeholder*='Buscar por SKU o nombre']");
+        WebDriverWait waitCorto = new WebDriverWait(driver, Duration.ofSeconds(2));
         long deadline = System.currentTimeMillis() + 15000;
         while (System.currentTimeMillis() < deadline) {
             try {
-                WebElement el = wait.until(ExpectedConditions.elementToBeClickable(item));
+                WebElement el = waitCorto.until(ExpectedConditions.elementToBeClickable(item));
                 new Actions(driver).moveToElement(el).pause(Duration.ofMillis(150)).click().perform();
                 pause();
                 return true;
-            } catch (StaleElementReferenceException stale) {
-                // React re-renderizo el item; reintentar con el elemento fresco
+            } catch (StaleElementReferenceException | ElementClickInterceptedException e) {
+                // React re-renderizo o algo tapo el item; reintentar con el elemento fresco
+            } catch (TimeoutException e) {
+                // El item aun no aparece: re-enfocar y re-disparar el onChange
+                try {
+                    WebElement input = driver.findElement(buscador);
+                    input.click();
+                    input.sendKeys(" ");
+                    input.sendKeys(org.openqa.selenium.Keys.BACK_SPACE);
+                    System.out.println("[seleccionarDelAutocomplete] retry '" + texto
+                            + "' | input='" + input.getDomProperty("value")
+                            + "' | matches=" + driver.findElements(item).size());
+                } catch (Exception diag) {
+                    System.out.println("[seleccionarDelAutocomplete] retry '" + texto
+                            + "' | buscador no disponible: " + diag.getMessage());
+                }
             } catch (Exception e) {
+                // cualquier otro error transitorio: seguir reintentando hasta el deadline
+            }
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 return false;
             }
         }
+        System.out.println("[seleccionarDelAutocomplete] FALLO '" + texto
+                + "' tras 15s | matches finales=" + driver.findElements(item).size());
         return false;
     }
 

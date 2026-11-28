@@ -189,26 +189,26 @@ class VentasUiE2ETest extends UiBaseTest {
 
     @Test
     @Order(8)
-    @DisplayName("CPNF-01 (UI): incorporar P001 a la venta excede 3 interacciones (FAIL documentado)")
+    @DisplayName("CPNF-01 (UI): seleccionar e incorporar P001 a la venta cumple el máximo de 3 interacciones")
     void cpnf01_flujoExcedeTresInteracciones() {
         asegurarSesionEmpleado();
         int interacciones = 0;
 
         buscarProductoEnVentas("Gaseosa");
-        // Interaccion 1: elegir el producto en el autocomplete
+        // Interacción 1: elegir el producto en el autocomplete
         assertTrue(seleccionarDelAutocomplete("Gaseosa 3L"),
                 "P001 debe ser seleccionable del autocomplete");
         interacciones++;
 
-        // Interaccion 2: ingresar la cantidad
+        // Interacción 2: ingresar cantidad y agregar al carrito/detalle
         ingresarCantidad("1");
-        interacciones++;
-
-        // Interaccion 3: agregar al carrito
         clickAgregarAlCarrito();
         interacciones++;
 
-        // Interaccion 4: confirmar la venta para que P001 quede incorporado
+        assertTrue(textoPagina().contains("Gaseosa 3L"),
+                "P001 debe quedar incorporado en el detalle antes de confirmar");
+
+        // Interacción 3: confirmar registro de la venta para incorporar P001
         click(By.xpath("//button[@type='submit' and contains(.,'Finalizar y Cobrar')]"));
         wait.until(ExpectedConditions.presenceOfElementLocated(
                 By.xpath("//*[contains(.,'Venta registrada exitosamente')]")));
@@ -216,7 +216,7 @@ class VentasUiE2ETest extends UiBaseTest {
         pause();
 
         assertTrue(interacciones <= 3,
-                "El flujo completo hasta incorporar P001 en la venta requiere "
-                        + interacciones + " interacciones y excede el maximo permitido de 3");
+                "El flujo hasta incorporar P001 tomó " + interacciones
+                        + " interacciones y excede el máximo permitido de 3");
     }
 }
